@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Criar Partida - Match Score</title>
+  <link rel="icon" href="imagens/loguinho2.png" type="image/png">
+  <link rel="stylesheet" href="css/criar.css">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <header class="main-header">
+    <button onclick="window.location.href='inicio.html'" aria-label="Voltar para a página inicial" class="back-button">← Voltar</button>
+  </header>
+
+  <main class="create-match-container">
+    <div class="form-card">
+      <div class="form-header">
+        <img src="imagens/loguinho2.png" alt="Logo Match Score" class="logo">
+        <h2>Criar Nova Partida</h2>
+        <p>Preencha os detalhes da partida abaixo</p>
+      </div>
+      
+      <form id="matchForm">
+        <input type="hidden" id="matchIdInput">
+
+        <div class="form-group">
+          <label for="nome">Nome da Partida</label>
+          <input type="text" id="nome" name="nome" required placeholder="Ex: Clássico dos Amigos">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="data">Data</label>
+            <input type="date" id="data" name="data" required>
+          </div>
+          <div class="form-group">
+            <label for="hora">Hora</label>
+            <input type="time" id="hora" name="hora" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="local">Local</label>
+          <select id="local" name="local" required>
+            <option value="">Selecione o local</option>
+            <option value="Arena KF quadra">Arena KF (Quadra)</option>
+            <option value="Arena KS Society">Arena KS (Society)</option>
+            <option value="Quadra com Grama Sintética">Quadra com Grama Sintética</option>
+            <option value="Arena 22">Arena 22</option>
+            <option value="Quadra do Cambuí">Quadra do Cambuí</option>
+          </select>
+        </div>
+
+        <div class="form-group image-upload-container">
+          <label for="imagemPartidaInput">Imagem da Partida (Opcional)</label>
+          <input type="file" id="imagemPartidaInput" name="imagemPartida" accept="image/*" style="display: none;">
+          <label for="imagemPartidaInput" class="upload-btn">
+            Selecionar Imagem
+          </label>
+          <img id="imagePreview" class="image-preview" alt="Pré-visualização da imagem">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="tipo">Tipo de Partida</label>
+            <select id="tipo" name="tipo" required>
+              <option value="" disabled selected>Selecione</option>
+              <option value="amistoso">Amistoso</option>
+              <option value="campeonato">Campeonato</option>
+              <option value="treino">Treino</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="jogadores">Jogadores por time</label>
+            <input type="number" id="jogadores" name="jogadores" min="1" max="15" required>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="submit-btn">Criar Partida</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <div id="toast-container"></div>
+  <div id="loading" class="loading-overlay">
+      <div class="loading-video-container">
+          <video class="loading-video" autoplay muted loop>
+              <source src="videos/loading MATCH SCORE.mp4" type="video/mp4">
+          </video>
+      </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js" defer></script>
+  
+  <script src="js/firebase-config.js" defer></script>
+  <script src="js/utils.js" defer></script> 
+  <script src="js/auth_guard.js" defer></script> 
+  <script src="js/criar.js" defer></script>
+  
+  <script>
+    (function(d){
+      var s = d.createElement("script");
+      s.setAttribute("data-account", "INSIRA_SEU_CÓDIGO_USERWAY_AQUI");
+      s.setAttribute("src", "https://cdn.userway.org/widget.js");
+      (d.body || d.head).appendChild(s);
+    })(document);
+  </script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Entrar</title>
+    <link rel="icon" href="imagens/loguinho2.png" type="image/png">
+    <link rel="stylesheet" href="css/entrar.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <button onclick="window.location.href='index.html'" aria-label="Voltar" class="back-button">←</button>
+    
+    <div id="toast-container"></div>
+
+    <div>
+        <div class="form-container">
+            <div class="logo">
+                <img src="imagens/loguinho.png" alt="Logo" class="logo-img">
+            </div>
+
+            <h2>Entrar</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <input type="email" id="email" placeholder="Seu email" required aria-label="Email">
+                </div>
+                
+                <div class="form-group">
+                    <input type="password" id="senha" placeholder="Sua senha" required aria-label="Senha">
+                    <a href="#" id="recuperar-senha" class="recuperar-senha-link">Recuperar senha?</a>
+                </div>
+                <button type="submit" class="form-submit-btn">Entrar</button>
+            </form>
+
+            <div class="google-btn">
+                <button type="button" id="google-signin" aria-label="Continuar com Google">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white" role="img" aria-hidden="true">
+                        <path d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972-3.332 0-6.033-2.701-6.033-6.032s2.701-6.032 6.033-6.032c1.498 0 2.866 0.549 3.921 1.453l2.814-2.814c-1.786-1.664-4.153-2.675-6.735-2.675-5.522 0-10 4.479-10 10s4.478 10 10 10c8.396 0 10-7.524 10-10 0-0.768-0.081-1.512-0.219-2.216h-9.781z"></path>
+                    </svg>
+                    Continuar com Google
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading" class="loading-screen" aria-live="polite" aria-busy="true" style="display: none;">
+        <video class="loading-video" src="videos/loading MATCH SCORE.mp4" autoplay loop muted></video>
+    </div>
+
+    <div class="social-container">
+        </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js" defer></script>
+    
+    <script src="js/firebase-config.js" defer></script>
+    <script src="js/utils.js" defer></script>
+    <script src="js/entrar.js" defer></script>
+    
+    <script>
+        (function(d){
+          var s = d.createElement("script");
+          s.setAttribute("data-account", "INSIRA_SEU_CÓDIGO_USERWAY_AQUI");
+          s.setAttribute("src", "https://cdn.userway.org/widget.js");
+          (d.body || d.head).appendChild(s);
+        })(document);
+    </script>
+</body>
+</html>

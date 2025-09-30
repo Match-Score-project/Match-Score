@@ -1,0 +1,171 @@
+/* ==========================================================================
+   Reset e Estilos Base
+   ========================================================================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Roboto', 'Arial', sans-serif;
+  background-color: #0f051d;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ==========================================================================
+   Cabeçalho
+   ========================================================================== */
+header {
+  width: 100%;
+  padding: 30px 20px 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(147, 112, 219, 0.2);
+}
+
+#logo {
+  height: 80px;
+  filter: drop-shadow(0 0 8px rgba(147, 112, 219, 0.7));
+}
+
+h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 3.5rem;
+  font-weight: 400;
+  color: #FFFFFF;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 0 0 15px rgba(193, 152, 219, 0.6);
+  margin-top: 10px;
+  animation: fadeIn 1s ease-out;
+}
+
+/* ==========================================================================
+   Conteúdo Principal
+   ========================================================================== */
+.container {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 30px;
+  padding: 40px 20px;
+  max-width: 1200px;
+  width: 100%;
+}
+
+.coluna {
+  flex: 1;
+  min-width: 250px;
+  max-width: 280px;
+  padding: 25px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(147, 112, 219, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  text-align: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  animation: fadeIn 1.2s ease-out forwards;
+  opacity: 0; /* Começa invisível para a animação */
+}
+
+/* Animação de entrada escalonada */
+.coluna:nth-child(1) { animation-delay: 0.1s; }
+.coluna:nth-child(2) { animation-delay: 0.2s; }
+.coluna:nth-child(3) { animation-delay: 0.3s; }
+.coluna:nth-child(4) { animation-delay: 0.4s; }
+
+.coluna:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 8px 30px rgba(147, 112, 219, 0.4);
+}
+
+.coluna img {
+  width: 60px;
+  margin-bottom: 20px;
+  filter: invert(0%) saturate(100%) brightness(100%) contrast(100%);
+}
+ 
+#bola {
+  filter: invert(100%);
+}
+
+.coluna h2 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.8rem;
+  color: #f0e8ff;
+  margin-bottom: 15px;
+  letter-spacing: 1px;
+}
+
+.coluna p {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #d1d1d1;
+}
+
+/* ==========================================================================
+   Botão e Rodapé
+   ========================================================================== */
+.btn-voltar {
+  margin: 20px auto 40px;
+  background: transparent;
+  color: #9370db;
+  border: 2px solid #9370db;
+  padding: 14px 35px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  font-weight: bold;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
+  letter-spacing: 1px;
+}
+
+.btn-voltar:hover {
+  background: #9370db;
+  color: #ffffff;
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(138, 43, 226, 0.5);
+}
+
+footer {
+  background-color: transparent;
+  color: #777;
+  text-align: center;
+  padding: 15px 20px;
+  font-size: 14px;
+  width: 100%;
+  margin-top: auto; /* Empurra para o final da página */
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================================================
+   Responsividade
+   ========================================================================== */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2.8rem;
+  }
+  
+  .container {
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 15px;
+    gap: 25px;
+  }
+
+  .coluna {
+    width: 100%;
+    max-width: 400px;
+  }
+}

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cadastro na Partida - Match Score</title>
+    <link rel="stylesheet" href="css/cadastrojogador.css">
+    <link rel="icon" href="imagens/loguinho2.png" type="image/png">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet" />
+</head>
+<body>
+    <header class="main-header">
+        <button onclick="window.location.href='inicio.html'" aria-label="Voltar para a página inicial" class="back-button">← Voltar</button>
+    </header>
+
+        <div class="match-info-display" id="match-info-display">
+            </div>
+
+        <h2>Complete Seu Perfil para esta Partida</h2>
+        
+        <div class="content-container">
+            <div class="court-container">
+                <div class="court-image-container">
+                    <img src="imagens/futsal.png" alt="Quadra de Futsal" class="court-image">
+                    
+                    <div class="position position-gk" data-position="Goleiro"></div>
+                    <div class="position position-fix" data-position="Fixo"></div>
+                    <div class="position position-ala-d" data-position="Ala Direita"></div>
+                    <div class="position position-ala-e" data-position="Ala Esquerda"></div>
+                    <div class="position position-piv" data-position="Pivô"></div>
+                </div>
+                <div class="selected-position">
+                    Posição na partida: <span id="selected-position-text">Nenhuma</span>
+                </div>
+            </div>
+
+            <div class="info-container">
+                <form id="playerForm">
+                    <div class="form-group photo-upload">
+                        <label for="player-photo-input">Foto do Perfil</label>
+                        <div class="photo-preview-container">
+                            <img id="photo-preview" src="imagens/perfil.png" alt="Preview da Foto">
+                            <input type="file" id="player-photo-input" accept="image/*" style="display: none;">
+                            <button type="button" class="upload-btn" onclick="document.getElementById('player-photo-input').click()">Alterar Foto</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="player-name">Nome Completo</label>
+                        <input type="text" id="player-name" placeholder="Ex: João Silva" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="player-nickname">Apelido (opcional)</label>
+                        <input type="text" id="player-nickname" placeholder="Ex: Joãozinho">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="player-age">Idade</label>
+                        <input type="number" id="player-age" min="12" max="99" placeholder="Ex: 25" required>
+                    </div>
+
+                    <input type="hidden" id="player-position-hidden" required>
+
+                    <button type="submit" class="form-submit-btn">Confirmar Presença</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+    <div id="loading" class="loading-overlay">
+        <div class="loading-video-container">
+            <video class="loading-video" autoplay muted loop>
+                <source src="videos/loading MATCH SCORE.mp4" type="video/mp4">
+            </video>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js" defer></script>
+    
+    <script src="js/firebase-config.js" defer></script>
+    <script src="js/utils.js" defer></script> 
+    <script src="js/auth_guard.js" defer></script> 
+    <script src="js/cadastrojogador.js" defer></script>
+
+</body>
+</html>

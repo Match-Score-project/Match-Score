@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+     
+    <meta charset="UTF-8">
+     
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+      <title>Match Score</title>
+     
+    <link rel="stylesheet" href="css/index.css">
+     
+    <link rel="icon" href="imagens/loguinho2.png" type="image/png">
+     
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+     
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+     
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:wght@400;700&display=swap"
+        rel="stylesheet">
+     
+     
+    <meta name="theme-color" content="#0f051d">
+     
+    <meta name="apple-mobile-web-app-capable" content="yes">
+     
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+     
+    <meta name="description"
+        content="Match Score conecta jogadores, times de futebol e futsal para marcar partidas amistosas. Crie seu perfil, encontre adversários e vença o jogo.">
+     
+    <meta name="keywords" content="Match Score, futebol, futsal, times, jogadores, partidas, esportes, jogos">
+     
+    <meta name="author" content="Match Score Team">
+</head>
+
+<body>
+      <div class="background" role="img" aria-label="Fundo estilizado com tema de futebol"></div>
+     
+      <main class="main-content">
+            <img class="mtscr" src="imagens/nome logo.png" alt="Match Score">
+            <div class="hero-content">
+                  <h1>Encontre seu time e vença o jogo</h1>
+                  <p class="subtitle">Sua próxima partida começa aqui. Agende jogos amistosos de forma rápida e fácil.
+            </p>
+                </div>
+
+            <nav class="button-container" aria-label="Navegação principal">
+                  <button id="criar-conta-btn" aria-label="Criar uma nova conta">Criar Conta</button>
+                  <button id="entrar-btn" class="secondary" aria-label="Entrar na sua conta">Entrar</button>
+                  <button id="sobre-btn" aria-label="Saiba mais sobre o aplicativo">Sobre o App</button>
+                </nav>
+          </main>
+
+      <footer>
+            © 2025 Match Score. Todos os direitos reservados.
+          </footer>
+
+      <div id="loading" class="loading-overlay" role="alert" aria-live="assertive" aria-busy="true" hidden>
+            <div class="loading-video-container">
+                  <video class="loading-video" autoplay muted loop>
+                       
+                <source src="videos/loading MATCH SCORE.mp4" type="video/mp4">
+                        Seu navegador não suporta vídeos HTML5.
+                     
+            </video>
+                </div>
+          </div>
+     
+     
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js" defer></script>
+     
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js" defer></script>
+     
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js" defer></script>
+     
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js" defer></script>
+
+     
+    <script src="js/firebase-config.js" defer></script>
+     
+     
+    <script src="js/index.js" defer></script>
+
+</body>
+
+</html>

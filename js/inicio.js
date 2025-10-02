@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const ui = {
         sidebar: document.getElementById('sidebar'),
+        sidebarOverlay: document.getElementById('sidebar-overlay'),
         profileInfoDiv: document.getElementById('profileInfo'),
         profilePicPreview: document.getElementById('profileImagePreview'),
         profileEditForm: document.getElementById('profileEditForm'),
@@ -25,51 +26,146 @@ document.addEventListener('DOMContentLoaded', () => {
         myMatchesGrid: document.getElementById('my-matches-grid'),
         registeredMatchesGrid: document.getElementById('registered-matches-grid'),
         matchDetailsContent: document.getElementById('matchDetailsContent'),
-        modalMatchTitle: document.getElementById('modalMatchTitle')
+        modalMatchTitle: document.getElementById('modalMatchTitle'),
+        notificationDot: document.getElementById('notificationDot'),
+        notificationsList: document.getElementById('notifications-list'),
+        // Novos elementos para os filtros
+        filterDate: document.getElementById('filter-date'),
+        filterLocal: document.getElementById('filter-local'),
+        filterType: document.getElementById('filter-type'),
+        clearFiltersBtn: document.getElementById('clear-filters-btn')
     };
 
     auth.onAuthStateChanged(user => {
         if (user) {
             currentUser = user;
             loadUserProfile();
-            fetchAndDisplayMatches();
+            fetchAndDisplayMatches(); // Busca inicial
             fetchAndDisplayMyMatches();
             fetchAndDisplayRegisteredMatches();
+            fetchAndDisplayNotifications();
         }
     });
-
+    
     // =================================================================================
-    // 2. LÓGICA DAS PARTIDAS
+    // 2. LÓGICA DAS NOTIFICAÇÕES (sem alterações)
     // =================================================================================
+    async function fetchAndDisplayNotifications() {
+        if (!currentUser || !ui.notificationsList) return;
 
-    // --- Lógica para Detalhes da Partida ---
+        try {
+            const snapshot = await db.collection('notificacoes')
+                .where('userId', '==', currentUser.uid)
+                .orderBy('timestamp', 'desc')
+                .limit(20)
+                .get();
+            
+            ui.notificationsList.innerHTML = '';
+            let hasUnread = false;
+
+            if (snapshot.empty) {
+                ui.notificationsList.innerHTML = '<p style="text-align: center; color: var(--light-gray);">Nenhuma notificação encontrada.</p>';
+                ui.notificationDot.classList.remove('visible');
+                return;
+            }
+
+            snapshot.forEach(doc => {
+                const notification = doc.data();
+                if (!notification.isRead) {
+                    hasUnread = true;
+                }
+
+                const date = notification.timestamp ? notification.timestamp.toDate().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+                
+                ui.notificationsList.innerHTML += `
+                    <div class="notification-item ${!notification.isRead ? 'unread' : ''}" id="notif-${doc.id}">
+                        <div class="notification-icon">💬</div>
+                        <div class="notification-content">
+                            <p>${notification.message}</p>
+                            <span class="timestamp">${date}</span>
+                        </div>
+                        <div class="notification-actions">
+                            <button class="btn-delete-notification" onclick="deleteNotification('${doc.id}')">&times;</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            ui.notificationDot.classList.toggle('visible', hasUnread);
+
+        } catch (error) {
+            console.error("Erro ao buscar notificações:", error);
+            ui.notificationsList.innerHTML = '<p>Erro ao carregar notificações. Verifique se o índice do Firestore foi criado.</p>';
+        }
+    }
+
+    async function markNotificationsAsRead() {
+        ui.notificationDot.classList.remove('visible');
+        
+        const unreadItems = ui.notificationsList.querySelectorAll('.notification-item.unread');
+        if (unreadItems.length === 0) return;
+
+        const batch = db.batch();
+        unreadItems.forEach(item => {
+            const notifId = item.id.replace('notif-', '');
+            const notifRef = db.collection('notificacoes').doc(notifId);
+            batch.update(notifRef, { isRead: true });
+            item.classList.remove('unread');
+        });
+
+        try {
+            await batch.commit();
+        } catch (error) {
+            console.error("Erro ao marcar notificações como lidas:", error);
+        }
+    }
+
+    async function deleteNotification(notificationId) {
+        try {
+            await db.collection('notificacoes').doc(notificationId).delete();
+            const elementToRemove = document.getElementById(`notif-${notificationId}`);
+            if (elementToRemove) {
+                elementToRemove.remove();
+            }
+            if (ui.notificationsList.children.length === 0) {
+                ui.notificationsList.innerHTML = '<p style="text-align: center; color: var(--light-gray);">Nenhuma notificação encontrada.</p>';
+            }
+            showToast('Notificação excluída.', 'info');
+        } catch (error) {
+            console.error("Erro ao apagar notificação:", error);
+            showToast('Erro ao excluir notificação.', 'error');
+        }
+    }
+    
+    // =================================================================================
+    // 3. LÓGICA DAS PARTIDAS
+    // =================================================================================
     async function openMatchDetails(matchId) {
         if (!matchId) return;
-
         openModal('matchDetailsModal');
         ui.matchDetailsContent.innerHTML = '<p>Carregando detalhes da partida...</p>';
         ui.modalMatchTitle.textContent = 'Detalhes da Partida';
-
         try {
             const matchPromise = db.collection('partidas').doc(matchId).get();
             const playersPromise = db.collection('partidas').doc(matchId).collection('jogadores').orderBy('cadastradoEm').get();
-
             const [matchDoc, playersSnapshot] = await Promise.all([matchPromise, playersPromise]);
-
             if (!matchDoc.exists) {
                 ui.matchDetailsContent.innerHTML = '<p>Partida não encontrada.</p>';
                 return;
             }
-
             const matchData = matchDoc.data();
             ui.modalMatchTitle.textContent = matchData.nome;
-
+            const isCreator = currentUser && currentUser.uid === matchData.creatorId;
             let playersHTML = '';
             if (playersSnapshot.empty) {
                 playersHTML = '<p>Nenhum jogador cadastrado ainda.</p>';
             } else {
                 playersSnapshot.forEach(playerDoc => {
                     const playerData = playerDoc.data();
+                    const playerId = playerDoc.id;
+                    const removeButton = isCreator && playerId !== currentUser.uid ?
+                        `<button class="btn-remove-player" onclick="removerJogador('${matchId}', '${playerId}', '${matchData.nome}')">×</button>` :
+                        '';
                     playersHTML += `
                         <div class="player-item">
                             <img src="${playerData.fotoURL || 'imagens/perfil.png'}" alt="Avatar" class="player-item-avatar">
@@ -77,11 +173,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span class="player-name">${playerData.nome}</span>
                                 <span class="player-position">${playerData.posicao}</span>
                             </div>
+                            ${removeButton}
                         </div>
                     `;
                 });
             }
-
             ui.matchDetailsContent.innerHTML = `
                 <div class="modal-match-info">
                     <p><strong>Data:</strong> ${formatDateToPtBr(matchData.data)} às ${matchData.hora}</p>
@@ -101,71 +197,34 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('Erro ao carregar detalhes.', 'error');
         }
     }
-
-    // --- Busca de Partidas Gerais ---
-    async function fetchAndDisplayMatches() {
-        if (!ui.allMatchesGrid || !ui.carouselSlides) return;
-        ui.allMatchesGrid.innerHTML = '<p>Carregando partidas...</p>';
-        ui.carouselSlides.innerHTML = '';
-        try {
-            const snapshot = await db.collection('partidas').orderBy('criadoEm', 'desc').get();
-            if (snapshot.empty) {
-                ui.allMatchesGrid.innerHTML = '<p>Nenhuma partida encontrada. Crie a primeira!</p>';
-                return;
+    
+    async function removerJogador(matchId, playerId, matchName) {
+        openConfirmModal('Remover Jogador', 'Você tem certeza?', async () => {
+            toggleLoading(true);
+            try {
+                await db.collection('partidas').doc(matchId).collection('jogadores').doc(playerId).delete();
+                await db.collection('notificacoes').add({
+                    userId: playerId,
+                    message: `Você foi removido da partida "${matchName}" pelo organizador.`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    isRead: false
+                });
+                showToast('Jogador removido com sucesso!', 'success');
+                openMatchDetails(matchId);
+            } catch (error) {
+                console.error("Erro ao remover jogador:", error);
+                showToast('Não foi possível remover o jogador.', 'error');
+            } finally {
+                toggleLoading(false);
             }
-            ui.allMatchesGrid.innerHTML = '';
-            let recentMatchesCount = 0;
-            snapshot.forEach(doc => {
-                const match = doc.data();
-                const docId = doc.id;
-                ui.allMatchesGrid.innerHTML += createMatchCard(match, docId);
-                if (recentMatchesCount < 5) {
-                    ui.carouselSlides.innerHTML += createCarouselSlide(match, docId);
-                    recentMatchesCount++;
-                }
-            });
-            setupCarousel();
-        } catch (error) {
-            console.error("Erro ao buscar partidas:", error);
-            ui.allMatchesGrid.innerHTML = '<p>Erro ao carregar as partidas.</p>';
-            showToast("Erro ao carregar partidas.", "error");
-        }
+        });
     }
-
-    // --- Busca de Partidas Criadas pelo Usuário ---
-    async function fetchAndDisplayMyMatches() {
-        if (!currentUser || !ui.myMatchesGrid) return;
-        ui.myMatchesGrid.innerHTML = '<p>Carregando suas partidas...</p>';
-        try {
-            const snapshot = await db.collection('partidas')
-                .where('creatorId', '==', currentUser.uid)
-                .orderBy('criadoEm', 'desc')
-                .get();
-            if (snapshot.empty) {
-                ui.myMatchesGrid.innerHTML = '<p>Você ainda não criou nenhuma partida.</p>';
-                return;
-            }
-            ui.myMatchesGrid.innerHTML = '';
-            snapshot.forEach(doc => {
-                const match = doc.data();
-                const docId = doc.id;
-                ui.myMatchesGrid.innerHTML += createMyMatchCard(match, docId);
-            });
-        } catch (error) {
-            console.error("Erro ao buscar 'Minhas Partidas':", error);
-            ui.myMatchesGrid.innerHTML = '<p>Erro ao carregar suas partidas.</p>';
-        }
-    }
-
-    // --- Busca de Partidas onde o Usuário se Cadastrou ---
+    
     async function fetchAndDisplayRegisteredMatches() {
         if (!currentUser || !ui.registeredMatchesGrid) return;
         ui.registeredMatchesGrid.innerHTML = '<p>Buscando jogos em que você se cadastrou...</p>';
         try {
-            const playerRegistrations = await db.collectionGroup('jogadores')
-                .where('userId', '==', currentUser.uid)
-                .get();
-
+            const playerRegistrations = await db.collectionGroup('jogadores').where('userId', '==', currentUser.uid).get();
             if (playerRegistrations.empty) {
                 ui.registeredMatchesGrid.innerHTML = '<p>Você não se cadastrou em nenhuma partida ainda.</p>';
                 return;
@@ -187,7 +246,102 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Funções de Criação de Cards ---
+    // =================== FUNÇÃO MODIFICADA PARA FILTROS ===================
+    async function fetchAndDisplayMatches() {
+        if (!ui.allMatchesGrid) return;
+        ui.allMatchesGrid.innerHTML = '<p>Carregando partidas...</p>';
+        // Limpa o carrossel apenas na busca inicial
+        if (!ui.filterDate.value && !ui.filterLocal.value && !ui.filterType.value) {
+             ui.carouselSlides.innerHTML = '';
+        }
+
+        // 1. Pega os valores dos filtros
+        const filterDate = ui.filterDate.value;
+        const filterLocal = ui.filterLocal.value.toLowerCase().trim();
+        const filterType = ui.filterType.value;
+
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const todayString = `${year}-${month}-${day}`;
+        
+        // A data de início é a data do filtro, ou hoje, o que for mais recente
+        const startDate = filterDate && filterDate > todayString ? filterDate : todayString;
+
+        try {
+            // 2. Monta a query base no Firebase
+            let query = db.collection('partidas').where('data', '>=', startDate);
+
+            if (filterType) {
+                query = query.where('tipo', '==', filterType);
+            }
+
+            query = query.orderBy('data', 'asc');
+            
+            const snapshot = await query.get();
+
+            let allMatches = [];
+            snapshot.forEach(doc => {
+                allMatches.push({ id: doc.id, ...doc.data() });
+            });
+
+            // 3. Aplica o filtro de local no lado do cliente (JavaScript)
+            let filteredMatches = allMatches;
+            if (filterLocal) {
+                filteredMatches = allMatches.filter(match => 
+                    match.local.toLowerCase().includes(filterLocal)
+                );
+            }
+
+            // 4. Exibe os resultados
+            if (filteredMatches.length === 0) {
+                ui.allMatchesGrid.innerHTML = '<p>Nenhuma partida encontrada com os filtros selecionados.</p>';
+            } else {
+                ui.allMatchesGrid.innerHTML = '';
+                filteredMatches.forEach(match => {
+                    ui.allMatchesGrid.innerHTML += createMatchCard(match, match.id);
+                });
+            }
+            
+            // Atualiza o carrossel apenas na busca inicial (sem filtros)
+            if (!ui.filterDate.value && !ui.filterLocal.value && !ui.filterType.value) {
+                const carouselMatches = filteredMatches.slice(0, 5);
+                ui.carouselSlides.innerHTML = '';
+                carouselMatches.forEach(match => {
+                     ui.carouselSlides.innerHTML += createCarouselSlide(match, match.id);
+                });
+                setupCarousel();
+            }
+
+        } catch (error) {
+            console.error("Erro ao buscar partidas:", error);
+            ui.allMatchesGrid.innerHTML = '<p>Erro ao carregar as partidas. Verifique se o índice do Firestore foi criado.</p>';
+        }
+    }
+    // ===================================================================
+
+    async function fetchAndDisplayMyMatches() {
+        if (!currentUser || !ui.myMatchesGrid) return;
+        ui.myMatchesGrid.innerHTML = '<p>Carregando suas partidas...</p>';
+        try {
+            const snapshot = await db.collection('partidas').where('creatorId', '==', currentUser.uid).orderBy('criadoEm', 'desc').get();
+            if (snapshot.empty) {
+                ui.myMatchesGrid.innerHTML = '<p>Você ainda não criou nenhuma partida.</p>';
+                return;
+            }
+            ui.myMatchesGrid.innerHTML = '';
+            snapshot.forEach(doc => {
+                const match = doc.data();
+                const docId = doc.id;
+                ui.myMatchesGrid.innerHTML += createMyMatchCard(match, docId);
+            });
+        } catch (error) {
+            console.error("Erro ao buscar 'Minhas Partidas':", error);
+            ui.myMatchesGrid.innerHTML = '<p>Erro ao carregar suas partidas.</p>';
+        }
+    }
+
     function createMatchCard(match, matchId) {
         const formattedDate = formatDateToPtBr(match.data);
         const imageUrl = match.imagemURL || 'imagens/campo.jpg';
@@ -260,7 +414,6 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    // --- Funções de Ação nas Partidas ---
     function cadastrarEmPartida(matchId) {
         if (!matchId) return showToast('ID da partida não encontrado.', 'error');
         window.location.href = `cadastrojogador.html?matchId=${matchId}`;
@@ -305,13 +458,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =================================================================================
-    // 3. CONTROLE DA UI (SIDEBAR, MODAIS, SEÇÕES)
+    // 4. CONTROLE DA UI (SIDEBAR, MODAIS, SEÇÕES) - sem alterações
     // =================================================================================
+    function closeAllModals() {
+        document.querySelectorAll('.modal.active').forEach(modal => {
+            if (modal.id !== 'confirmModal') {
+                modal.classList.remove('active');
+            }
+        });
+        if (document.querySelectorAll('.modal.active').length === 0) {
+            document.body.style.overflow = 'auto';
+        }
+    }
+
     function openModal(modalId) {
+        if (modalId !== 'confirmModal') {
+            closeAllModals(); 
+        }
         const modal = document.getElementById(modalId);
         if (modal) {
             modal.classList.add('active');
             document.body.style.overflow = 'hidden';
+            if (modalId === 'notificationsModal') {
+                markNotificationsAsRead();
+            }
         }
     }
 
@@ -326,6 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function openConfirmModal(title, message, onConfirmCallback) {
+        openModal('confirmModal');
         const confirmTitle = document.getElementById('confirmTitle');
         const confirmMessage = document.getElementById('confirmMessage');
         const confirmBtn = document.getElementById('confirmBtn');
@@ -338,26 +509,32 @@ document.addEventListener('DOMContentLoaded', () => {
             onConfirmCallback();
             closeModal('confirmModal');
         }, { once: true });
-        openModal('confirmModal');
     }
 
-    function toggleSidebar() {
-        ui.sidebar.classList.toggle('active');
+    function toggleSidebar(forceOpen) {
+        const isOpen = ui.sidebar.classList.contains('open');
+        const shouldOpen = forceOpen !== undefined ? forceOpen : !isOpen;
+
+        ui.sidebar.classList.toggle('open', shouldOpen);
+        if (ui.sidebarOverlay) {
+            ui.sidebarOverlay.classList.toggle('active', shouldOpen);
+        }
     }
 
     function showSection(sectionId) {
+        closeAllModals(); 
         document.querySelectorAll('.page-section').forEach(section => {
             section.style.display = 'none';
         });
         const content = document.getElementById(`${sectionId}-content`);
         if (content) content.style.display = 'block';
-        if (window.innerWidth <= 768 && ui.sidebar.classList.contains('active')) {
-            toggleSidebar();
+        if (window.innerWidth <= 768 && ui.sidebar.classList.contains('open')) {
+            toggleSidebar(false);
         }
     }
 
     // =================================================================================
-    // 4. LÓGICA DO PERFIL DO USUÁRIO
+    // 5. LÓGICA DO PERFIL DO USUÁRIO (sem alterações)
     // =================================================================================
     async function loadUserProfile() {
         if (!currentUser) return;
@@ -367,7 +544,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = doc.data();
                 ui.profilePicPreview.src = data.fotoURL || 'imagens/perfil.png';
                 ui.profileInfoDiv.innerHTML = `<p><strong>Nome:</strong> ${data.nome || ''}</p><p><strong>Email:</strong> ${data.email || ''}</p><p><strong>Telefone:</strong> ${data.telefone || ''}</p><p><strong>Data Nasc:</strong> ${formatDateToPtBr(data.dataNascimento) || ''}</p><p><strong>Posição:</strong> ${data.posicao || ''}</p>`;
-                applyTheme(data.theme || 'dark');
+                const isDark = (data.theme !== 'light');
+                applyTheme(isDark);
             } else {
                 showToast("Perfil não encontrado.", "error");
             }
@@ -447,18 +625,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =================================================================================
-    // 5. LÓGICA DAS CONFIGURAÇÕES (TEMA, LOGOUT)
+    // 6. LÓGICA DAS CONFIGURAÇÕES (sem alterações)
     // =================================================================================
-    function applyTheme(theme) {
-        document.body.classList.toggle('light-mode', theme === 'light');
-        ui.themeToggle.checked = (theme !== 'light');
+    function applyTheme(isDark) {
+        document.body.classList.toggle('light-mode', !isDark);
+        ui.themeToggle.checked = isDark;
     }
 
     ui.themeToggle.addEventListener('change', () => {
-        const newTheme = ui.themeToggle.checked ? 'dark' : 'light';
-        applyTheme(newTheme);
+        const isDark = ui.themeToggle.checked;
+        applyTheme(isDark);
         if (currentUser) {
-            db.collection('usuarios').doc(currentUser.uid).set({ theme: newTheme }, { merge: true });
+            db.collection('usuarios').doc(currentUser.uid).set({ theme: isDark ? 'dark' : 'light' }, { merge: true });
         }
     });
 
@@ -475,18 +653,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =================================================================================
-    // 6. LÓGICA DO CARROSSEL
+    // 7. LÓGICA DO CARROSSEL (sem alterações)
     // =================================================================================
     function setupCarousel() {
         const slidesContainer = ui.carouselSlides;
         if (!slidesContainer || slidesContainer.children.length === 0) return;
         const btnAnterior = document.getElementById("btn-anterior");
         const btnProximo = document.getElementById("btn-proximo");
-        const totalSlides = slidesContainer.children.length;
         let slideAtual = 0;
-        const getSlidesVisiveis = () => window.innerWidth <= 480 ? 1 : (window.innerWidth <= 768 ? 2 : 4);
         const atualizarCarousel = () => {
             if (slidesContainer.children.length === 0) return;
+            const totalSlides = slidesContainer.children.length;
+            const getSlidesVisiveis = () => {
+                if (window.innerWidth <= 480) return 1;
+                if (window.innerWidth <= 768) return 2;
+                return 4;
+            };
             const visiveis = getSlidesVisiveis();
             const maxIndex = Math.max(0, totalSlides - visiveis);
             slideAtual = Math.max(0, Math.min(slideAtual, maxIndex));
@@ -496,20 +678,14 @@ document.addEventListener('DOMContentLoaded', () => {
             btnAnterior.disabled = slideAtual === 0;
             btnProximo.disabled = slideAtual >= maxIndex;
         };
-        btnAnterior.onclick = () => {
-            slideAtual--;
-            atualizarCarousel();
-        };
-        btnProximo.onclick = () => {
-            slideAtual++;
-            atualizarCarousel();
-        };
+        btnAnterior.onclick = () => { slideAtual--; atualizarCarousel(); };
+        btnProximo.onclick = () => { slideAtual++; atualizarCarousel(); };
         window.onresize = atualizarCarousel;
         atualizarCarousel();
     }
 
     // =================================================================================
-    // 7. FUNÇÕES UTILITÁRIAS
+    // 8. FUNÇÕES UTILITÁRIAS (sem alterações)
     // =================================================================================
     function formatDateToPtBr(dateInput) {
         if (!dateInput) return '';
@@ -518,7 +694,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =================================================================================
-    // 8. LISTENERS DE EVENTOS E FUNÇÕES GLOBAIS
+    // 9. LISTENERS E FUNÇÕES GLOBAIS
     // =================================================================================
     Object.assign(window, {
         toggleSidebar,
@@ -533,7 +709,20 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteMatch,
         cadastrarEmPartida,
         cancelarInscricao,
-        openMatchDetails
+        openMatchDetails,
+        removerJogador,
+        deleteNotification
+    });
+
+    // Adiciona os listeners para os filtros
+    ui.filterDate.addEventListener('change', fetchAndDisplayMatches);
+    ui.filterLocal.addEventListener('input', fetchAndDisplayMatches);
+    ui.filterType.addEventListener('change', fetchAndDisplayMatches);
+    ui.clearFiltersBtn.addEventListener('click', () => {
+        ui.filterDate.value = '';
+        ui.filterLocal.value = '';
+        ui.filterType.value = '';
+        fetchAndDisplayMatches();
     });
 
     ui.profileImageInputEdit.addEventListener('change', handleProfileImageChange);

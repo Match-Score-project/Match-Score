@@ -1,11 +1,12 @@
-/* Reset e estilos básicos */
+/* ============================================== */
+/* GERAL E VARIÁVEIS DE TEMA                      */
+/* ============================================== */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-/* Variáveis de tema unificadas com o resto do app */
 body {
     --primary-color: #8A2BE2;
     --primary-hover: #7B1FA2;
@@ -18,7 +19,7 @@ body {
     --danger-color: #ff3b3b;
     --success-color: #00bf63;
 }
-  
+
 body.light-mode {
     --card-bg: #ffffff;
     --bg-color: #f5f5f5;
@@ -29,16 +30,18 @@ body.light-mode {
 }
 
 body {
-  font-family: 'Roboto', sans-serif;
-  margin: 0;
-  padding: 0;
-  background-color: var(--bg-color);
-  color: var(--text-primary);
-  transition: background-color 0.3s, color 0.3s;
-  line-height: 1.6;
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    transition: background-color 0.3s, color 0.3s;
+    line-height: 1.6;
 }
 
-/* Estilo do Header */
+/* ============================================== */
+/* HEADER                                         */
+/* ============================================== */
 .main-header {
     display: flex;
     justify-content: flex-start;
@@ -47,7 +50,7 @@ body {
     background-color: var(--card-bg);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
-  
+
 .back-button {
     background-color: transparent;
     color: var(--primary-color);
@@ -59,26 +62,19 @@ body {
     font-weight: 600;
     transition: all 0.3s ease;
 }
-  
+
 .back-button:hover {
     background-color: var(--primary-color);
     color: white;
 }
 
+/* ============================================== */
+/* CONTAINER PRINCIPAL E LAYOUT                   */
+/* ============================================== */
 .main-container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 2rem;
-}
-
-.logo {
-    text-align: center;
-    margin-bottom: 20px;
-}
-
-.logo img {
-    height: 60px;
-    width: auto;
 }
 
 h2 {
@@ -97,6 +93,44 @@ h2 {
     align-items: flex-start;
 }
 
+/* ============================================== */
+/* INFORMAÇÕES DA PARTIDA E AVISOS                */
+/* ============================================== */
+.match-info-display {
+    text-align: center;
+    margin-bottom: 20px;
+    background-color: var(--input-bg);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.match-info-display h3 {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.match-info-display p {
+    margin: 5px 0;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.full-warning {
+    text-align: center;
+    background-color: rgba(255, 59, 59, 0.1);
+    color: var(--danger-color, #ff3b3b);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--danger-color, #ff3b3b);
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+/* ============================================== */
+/* QUADRA E POSIÇÕES                              */
+/* ============================================== */
 .court-container {
     flex: 1;
     max-width: 450px;
@@ -127,22 +161,21 @@ h2 {
 }
 
 .selected-position span {
-    color: var(--danger-color);
+    color: var(--success-color);
     font-weight: normal;
 }
 
-/* Estilos para as posições na quadra */
 .position {
     position: absolute;
     width: 25px;
     height: 25px;
     border-radius: 50%;
-    background-color: var(--danger-color);
     cursor: pointer;
     transition: all 0.3s ease;
     border: 2px solid white;
     box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
     transform: translate(-50%, -50%);
+    background-color: #f1c40f; /* Cor padrão 'carregando' */
 }
 
 .position:hover {
@@ -150,39 +183,40 @@ h2 {
 }
 
 .position.active {
-    background-color: var(--success-color);
     transform: translate(-50%, -50%) scale(1.3);
     border-color: var(--primary-color);
 }
 
-.position::after {
-    content: attr(data-position);
-    position: absolute;
-    bottom: 120%;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity 0.3s;
-    pointer-events: none;
+.position.available {
+    background-color: var(--success-color);
 }
 
-.position:hover::after {
-    opacity: 1;
+.position.unavailable {
+    background-color: var(--danger-color);
+    cursor: not-allowed;
 }
 
-/* Posicionamento das bolinhas */
 .position-gk { top: 85%; left: 50%; }
 .position-fix { top: 65%; left: 50%; }
 .position-ala-d { top: 45%; left: 78%; }
 .position-ala-e { top: 45%; left: 22%; }
 .position-piv { top: 25%; left: 50%; }
 
+.tooltip {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    pointer-events: none;
+    display: none;
+    z-index: 100;
+}
+
+/* ============================================== */
+/* FORMULÁRIO DE INFORMAÇÕES                      */
+/* ============================================== */
 .info-container {
     flex: 1.2;
     max-width: 550px;
@@ -217,6 +251,14 @@ h2 {
     transition: all 0.3s ease;
 }
 
+/* Adicionado para estilizar campos readonly */
+.form-group input[readonly] {
+    background-color: #3a3a3a;
+    color: var(--text-secondary);
+    cursor: not-allowed;
+}
+
+
 .form-group input:focus,
 .form-group select:focus {
     border-color: var(--primary-color);
@@ -232,7 +274,7 @@ h2 {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 15px;
+    /* A propriedade 'gap' foi removida pois não há mais botão abaixo */
 }
 
 #photo-preview {
@@ -243,19 +285,7 @@ h2 {
     border: 3px solid var(--border-color);
 }
 
-.upload-btn {
-    padding: 10px 20px;
-    background-color: var(--input-bg);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.upload-btn:hover {
-    border-color: var(--primary-color);
-}
+/* O estilo do .upload-btn foi removido pois o botão não existe mais */
 
 .form-submit-btn {
     width: 100%;
@@ -275,69 +305,23 @@ h2 {
     background-color: var(--primary-hover);
 }
 
-@media (max-width: 768px) {
-    .content-container {
-        flex-direction: column;
-        align-items: center;
-    }
-    .court-container, .info-container {
-        width: 100%;
-        max-width: 500px;
-    }
-    .main-container, .info-container {
-        padding: 1.5rem;
-    }
+.form-submit-btn:disabled {
+    background-color: var(--text-secondary);
+    cursor: not-allowed;
 }
 
 /* ============================================== */
-/* ESTILOS PARA A TELA DE CARREGAMENTO (LOADING) */
-/* ============================================== */
-.loading-overlay {
-    position: fixed; /* Fica fixo na tela, mesmo com rolagem */
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999; /* Garante que fique acima de tudo */
-  
-    /* Controla a visibilidade */
-    opacity: 0;
-    pointer-events: none; /* Não pode ser clicado quando invisível */
-    transition: opacity 0.3s ease;
-  }
-  
-  /* Classe que o JavaScript adiciona para mostrar o loading */
-  .loading-overlay.visible {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  
-  .loading-video-container {
-    width: 100%;
-    max-width: 400px;
-  }
-  
-  .loading-video {
-    width: 100%;
-    height: auto;
-  }
-
-  /* ============================================== */
-/* ESTILOS PARA AS NOTIFICAÇÕES (TOAST)         */
+/* ELEMENTOS DE UI (TOAST, LOADING) E RESPONSIVO  */
 /* ============================================== */
 #toast-container {
     position: fixed;
     top: 20px;
-    left: 50%; /* NOVO: Move o início do container para o meio da tela */
-    transform: translateX(-50%); /* NOVO: Desloca o container para a esquerda pela metade de seu tamanho, centralizando-o */
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 10000;
     display: flex;
     flex-direction: column;
-    align-items: center; /* ALTERADO: Alinha os toasts no centro do container */
+    align-items: center;
 }
 
 .toast {
@@ -353,22 +337,62 @@ h2 {
     animation: slideIn 0.5s forwards;
 }
 
-/* Cores baseadas nas variáveis de tema que já temos */
-.toast.success {
-    background-color: var(--success-color, #00bf63);
-}
-
-.toast.error {
-    background-color: var(--danger-color, #ff3b3b);
-}
-
-.toast.info {
-    background-color: #5bc0de; /* Uma cor neutra para informação */
-}
+.toast.success { background-color: var(--success-color, #00bf63); }
+.toast.error { background-color: var(--danger-color, #ff3b3b); }
+.toast.info { background-color: #5bc0de; }
 
 @keyframes slideIn {
     to {
         opacity: 1;
         transform: translateX(0);
+    }
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.loading-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.loading-video-container {
+    width: 100%;
+    max-width: 400px;
+}
+
+.loading-video {
+    width: 100%;
+    height: auto;
+}
+
+@media (max-width: 768px) {
+    .content-container {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .court-container,
+    .info-container {
+        width: 100%;
+        max-width: 500px;
+    }
+
+    .main-container,
+    .info-container {
+        padding: 1.5rem;
     }
 }

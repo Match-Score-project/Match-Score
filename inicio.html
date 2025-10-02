@@ -1,288 +1,246 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Match Score</title>
-  <link rel="stylesheet" href="css/inicio.css">
-  <link rel="icon" href="imagens/loguinho2.png" type="image/png">
-  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Match Score</title>
+    <link rel="stylesheet" href="css/inicio.css">
+    <link rel="icon" href="imagens/loguinho2.png" type="image/png">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
-  <header class="app-header">
-    <button class="btn btn-menu" onclick="toggleSidebar()" aria-label="Abrir menu">☰</button>
-    
-    <div class="logo">
-      <img src="imagens/loguinho.png" alt="Match Score">
-    </div>
-    
-    <div>
-      <button class="btn btn-create" onclick="window.location.href='criar.html'">Criar Partida</button>
-    </div>
-  </header>
+    <header class="app-header">
+        <button class="btn btn-menu" onclick="toggleSidebar()" aria-label="Abrir menu">☰</button>
+        <div class="header-right">
+            <button class="btn btn-create" onclick="window.location.href='criar.html'">Criar Partida</button>
+        </div>
+    </header>
 
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <h2>Menu</h2>
-    </div>
-    
-    <ul class="nav-menu">
-      <li class="nav-item"><a href="#" class="nav-link" onclick="showSection('home')">Amistosos</a></li>
-      <li class="nav-item"><a href="#" class="nav-link" onclick="openModal('profileModal')">Perfil</a></li>
-      <li class="nav-item"><a href="#" class="nav-link" onclick="openModal('settingsModal')">Configurações</a></li>
-      <li class="nav-item"><a href="#" class="nav-link" onclick="showSection('friends')">Amigos</a></li>
-      <li class="nav-item"><a href="#" class="nav-link" onclick="showSection('my-matches')">Minhas Partidas</a></li> 
-      <li class="nav-item"><a href="#" class="nav-link" onclick="showSection('jogos-cadastrados')">Jogos Cadastrados</a></li>
-    </ul>
-  </aside>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>Menu</h2>
+            <button class="notification-bell-btn" onclick="openModal('notificationsModal')" aria-label="Abrir notificações">
+                <i class="fa-solid fa-bell"></i>
+                <span class="notification-dot" id="notificationDot"></span>
+            </button>
+        </div>
+        
+        <ul class="nav-menu">
+            <li class="nav-item"><a href="#" class="nav-link" onclick="showSection('home')">Amistosos</a></li>
+            <li class="nav-item"><a href="#" class="nav-link" onclick="openModal('profileModal')">Perfil</a></li>
+            <li class="nav-item"><a href="#" class="nav-link" onclick="openModal('settingsModal')">Configurações</a></li>
+            <li class="nav-item"><a href="#" class="nav-link" onclick="showSection('friends')">Amigos</a></li>
+            <li class="nav-item"><a href="#" class="nav-link" onclick="showSection('my-matches')">Minhas Partidas</a></li> 
+            <li class="nav-item"><a href="#" class="nav-link" onclick="showSection('jogos-cadastrados')">Jogos Cadastrados</a></li>
+        </ul>
+    </aside>
 
-  <main class="content-wrapper">
-    <div class="main-content page-section" id="home-content">
-      
-      <section>
-        <h2 class="section-title">Criações Recentes</h2>
-        <div class="carrossel">
-          <div class="slides" id="slides">
-              <div class="slide">
-                  <img src="https://upload.wikimedia.org/wikipedia/pt/thumb/4/43/FCBarcelona.svg/2020px-FCBarcelona.svg.png" class="carrossel-img" alt="Barcelona">
-                  <div class="slide-content">
-                      <h3>FC Barcelona</h3>
-                      <p>Jogo em Quadra</p>
-                      <button class="btn-cadastrar-match" onclick="cadastrojogador()">Cadastrar</button>
-                  </div>
-              </div>
-              <div class="slide">
-                  <img src="https://upload.wikimedia.org/wikipedia/pt/9/98/Real_Madrid.png" class="carrossel-img" alt="Real Madrid">
-                  <div class="slide-content">
-                      <h3>Real Madrid</h3>
-                      <p>Jogo em Quadra</p>
-                      <button class="btn-cadastrar-match" onclick="cadastrojogador()">Cadastrar</button>
-                  </div>
-              </div>
-              <div class="slide">
-                  <img src="https://upload.wikimedia.org/wikipedia/pt/thumb/0/0c/Liverpool_FC.svg/1200px-Liverpool_FC.svg.png" class="carrossel-img" alt="Liverpool">
-                  <div class="slide-content">
-                      <h3>Liverpool FC</h3>
-                      <p>Jogo em Campo</p>
-                      <button class="btn-cadastrar-match" onclick="cadastrojogador()">Cadastrar</button>
-                  </div>
-              </div>
-              <div class="slide">
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Logo_of_AC_Milan.svg/640px-Logo_of_AC_Milan.svg.png" class="carrossel-img" alt="AC Milan">
-                  <div class="slide-content">
-                      <h3>AC Milan</h3>
-                      <p>Fundado em 1899</p>
-                      <button class="btn-cadastrar-match" onclick="cadastrojogador()">Cadastrar</button>
-                  </div>
-              </div>
-              <div class="slide">
-                  <img src="https://upload.wikimedia.org/wikipedia/en/thumb/7/7a/Manchester_United_FC_crest.svg/1200px-Manchester_United_FC_crest.svg.png" class="carrossel-img" alt="Manchester United">
-                  <div class="slide-content">
-                      <h3>Manchester United</h3>
-                      <p>Fundado em 1878</p>
-                      <button class="btn-cadastrar-match" onclick="cadastrojogador()">Cadastrar</button>
-                  </div>
-              </div>
-          </div>
-          <div class="controles">
-              <button id="btn-anterior" aria-label="Slide anterior">❮</button>
-              <button id="btn-proximo" aria-label="Próximo slide">❯</button>
-          </div>
-          <div class="indicadores" id="indicadores"></div>
-      </div>
-      </section>
-      
-      <section class="section all-matches">
-        <h2 class="section-title">Todas as Partidas</h2>
-        <div class="all-matches-grid" id="all-matches-grid">
-            <div class="match-card">
-                <img src="https://upload.wikimedia.org/wikipedia/pt/thumb/4/43/FCBarcelona.svg/2020px-FCBarcelona.svg.png" class="match-card-img" alt="Barcelona">
-                <div class="match-card-content">
-                    <h3>FC Barcelona</h3>
-                    <p>Jogo em Quadra</p>
-                    <button class="btn-cadastrar-match" onclick="cadastrojogador()">Cadastrar</button>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <main class="content-wrapper">
+        <div class="main-content page-section" id="home-content">
+            <section>
+                <h2 class="section-title">Criações Recentes</h2>
+                <div class="carrossel">
+                    <div class="slides" id="slides"></div>
+                    <div class="controles">
+                        <button id="btn-anterior" aria-label="Slide anterior">❮</button>
+                        <button id="btn-proximo" aria-label="Próximo slide">❯</button>
+                    </div>
+                </div>
+            </section>
+            
+            <section class="section all-matches">
+                <h2 class="section-title">Todas as Partidas</h2>
+
+                <div class="filters-container">
+                    <div class="filter-group">
+                        <label for="filter-date">Data a partir de:</label>
+                        <input type="date" id="filter-date">
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-local">Local:</label>
+                        <input type="text" id="filter-local" placeholder="Digite um local...">
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-type">Tipo:</label>
+                        <select id="filter-type">
+                            <option value="">Todos</option>
+                            <option value="futsal">Futsal</option>
+                            <option value="society">Society</option>
+                            <option value="campo">Campo</option>
+                        </select>
+                    </div>
+                    <button id="clear-filters-btn" class="btn-clear-filters">Limpar</button>
+                </div>
+                <div class="all-matches-grid" id="all-matches-grid"></div>
+            </section>
+        </div>
+
+        <div class="main-content page-section" id="friends-content" style="display:none;">
+             <section class="section">
+                <h2 class="section-title">Amigos</h2>
+                <input type="text" class="search-bar" placeholder="Buscar amigos...">
+                <div class="tabs">
+                    <div class="tab active" onclick="changeFriendsTab('all')">Todos</div>
+                    <div class="tab" onclick="changeFriendsTab('online')">Online</div>
+                    <div class="tab" onclick="changeFriendsTab('pending')">Solicitações</div>
+                </div>
+                <ul class="friends-list" id="friends-list"></ul>
+            </section>
+        </div>
+        
+        <div class="main-content page-section" id="my-matches-content" style="display:none;">
+            <section class="section">
+                <h2 class="section-title">Minhas Partidas Criadas</h2>
+                <p>Aqui você pode editar ou excluir as partidas que você criou.</p>
+                <div class="all-matches-grid" id="my-matches-grid"></div>
+            </section>
+        </div>
+
+        <div class="main-content page-section" id="jogos-cadastrados-content" style="display:none;">
+            <section class="section">
+                <h2 class="section-title">Meus Jogos Cadastrados</h2>
+                <div class="all-matches-grid" id="registered-matches-grid"></div>
+            </section>
+        </div>
+    </main>
+    
+    <footer class="app-footer">
+        <p>&copy; 2025 Match Score. Todos os direitos reservados.</p>
+    </footer>
+
+    <div class="modal" id="settingsModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Configurações</h3>
+                <button class="btn-close" onclick="closeModal('settingsModal')" aria-label="Fechar modal">×</button>
+            </div>
+            <div class="modal-content settings-container">
+                <div class="settings-group">
+                    <h4 class="settings-title">Tema</h4>
+                    <div class="setting-option">
+                        <span>Modo escuro</span>
+                        <label class="switch">
+                            <input type="checkbox" id="themeToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h4 class="settings-title">Conta</h4>
+                    <div class="setting-option" style="flex-direction: column; align-items: flex-start; gap: 10px;">
+                        <span>Sair da conta</span>
+                        <button class="btn btn-secondary" onclick="logout()">Sair</button>
+                    </div>
                 </div>
             </div>
         </div>
-      </section>
-      
     </div>
 
-    <div class="main-content page-section" id="friends-content" style="display:none;">
-      <section class="section">
-        <h2 class="section-title">Amigos</h2>
-        <input type="text" class="search-bar" placeholder="Buscar amigos...">
-        <div class="tabs">
-          <div class="tab active" onclick="changeFriendsTab('all')">Todos</div>
-          <div class="tab" onclick="changeFriendsTab('online')">Online</div>
-          <div class="tab" onclick="changeFriendsTab('pending')">Solicitações</div>
+    <div class="modal" id="profileModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Meu Perfil</h3>
+                <button class="btn-close" onclick="closeModal('profileModal')" aria-label="Fechar modal">×</button>
+            </div>
+            <div class="modal-content">
+                <div class="profile-container">
+                    <div class="profile-pic-container">
+                        <img src="imagens/perfil.png" alt="Foto de perfil" class="profile-pic" id="profileImagePreview">
+                        <div class="edit-overlay">
+                            <button class="edit-image-btn" onclick="document.getElementById('profileImageInputEdit').click()">
+                                <span>Editar Foto</span>
+                            </button>
+                        </div>
+                    </div>
+                    <input type="file" id="profileImageInputEdit" accept="image/*" style="display: none;">
+                    <div class="profile-info" id="profileInfo"><p>Carregando perfil...</p></div>
+                    <div class="profile-edit-form" id="profileEditForm" style="display: none;">
+                        <form id="editProfileForm">
+                            <div class="form-group"><label for="editNome">Nome:</label><input type="text" id="editNome" name="nome" required></div>
+                            <div class="form-group"><label for="editEmail">Email:</label><input type="email" id="editEmail" name="email" required></div>
+                            <div class="form-group"><label for="editTelefone">Telefone:</label><input type="tel" id="editTelefone" name="telefone"></div>
+                            <div class="form-group"><label for="editDataNascimento">Data de Nascimento:</label><input type="date" id="editDataNascimento" name="dataNascimento"></div>
+                            <div class="form-group">
+                                <label for="editPosicao">Posição:</label>
+                                <select id="editPosicao" name="posicao">
+                                    <option value="" disabled selected>Selecione uma posição</option>
+                                    <option value="Goleiro">Goleiro</option>
+                                    <option value="Fixo">Fixo</option>
+                                    <option value="Ala Esquerdo">Ala Esquerdo</option>
+                                    <option value="Ala Direito">Ala Direito</option>
+                                    <option value="Pivô">Pivô</option>
+                                </select>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-primary" onclick="saveProfileChanges()">Salvar</button>
+                                <button type="button" class="btn btn-secondary" onclick="cancelProfileEdit()">Cancelar</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="profile-actions">
+                        <button class="btn btn-primary" id="editProfileBtn" onclick="enterEditMode()">Editar Perfil</button>
+                    </div>
+                </div>
+            </div>
         </div>
-        <ul class="friends-list" id="friends-list"></ul>
-      </section>
     </div>
     
-    <div class="main-content page-section" id="my-matches-content" style="display:none;">
-      <section class="section">
-          <h2 class="section-title">Minhas Partidas Criadas</h2>
-          <p>Aqui você pode editar ou excluir as partidas que você criou.</p>
-          <div class="all-matches-grid" id="my-matches-grid">
-              </div>
-      </section>
-  </div>
-
-    <div class="main-content page-section" id="jogos-cadastrados-content" style="display:none;">
-        <section class="section">
-            <h2 class="section-title">Meus Jogos Cadastrados</h2>
-            <div class="all-matches-grid" id="registered-matches-grid">
+    <div class="modal" id="confirmModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="confirmTitle">Confirmar Ação</h3>
+                <button class="btn-close" onclick="closeModal('confirmModal')" aria-label="Fechar modal">×</button>
             </div>
-        </section>
-    </div>
-  </main>
-  
-  <footer class="app-footer">
-    <p>&copy; 2025 Match Score. Todos os direitos reservados.</p>
-  </footer>
-
-  <div class="modal" id="settingsModal">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3>Configurações</h3>
-        <button class="btn-close" onclick="closeModal('settingsModal')" aria-label="Fechar modal">×</button>
-      </div>
-      <div class="settings-container">
-        <div class="settings-group">
-          <h4 class="settings-title">Tema</h4>
-          <div class="setting-option">
-            <span>Modo escuro</span>
-            <label class="switch">
-              <input type="checkbox" id="themeToggle">
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-        <div class="settings-group">
-          <h4 class="settings-title">Conta</h4>
-          <div class="setting-option" style="flex-direction: column; align-items: flex-start; gap: 10px;">
-            <span>Sair da conta</span>
-            <button class="btn btn-secondary" onclick="logout()">Sair</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal" id="profileModal">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3>Meu Perfil</h3>
-        <button class="btn-close" onclick="closeModal('profileModal')" aria-label="Fechar modal">×</button>
-      </div>
-      <div class="modal-content">
-        <div class="profile-container">
-          <div class="profile-pic-container">
-            <img src="imagens/perfil.png" alt="Foto de perfil" class="profile-pic" id="profileImagePreview">
-            <div class="edit-overlay">
-              <button class="edit-image-btn" onclick="document.getElementById('profileImageInputEdit').click()">
-                <span>Editar Foto</span>
-              </button>
+            <div class="modal-content">
+                <p id="confirmMessage">Você tem certeza?</p>
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button type="button" class="btn btn-primary" id="confirmBtn">Confirmar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('confirmModal')">Cancelar</button>
+                </div>
             </div>
-          </div>
-          <input type="file" id="profileImageInputEdit" accept="image/*" style="display: none;">
-
-          <div class="profile-info" id="profileInfo">
-            <p>Carregando perfil...</p>
-          </div>
-          
-          <div class="profile-edit-form" id="profileEditForm" style="display: none;">
-            <form id="editProfileForm">
-              <div class="form-group">
-                <label for="editNome">Nome:</label>
-                <input type="text" id="editNome" name="nome" required>
-              </div>
-              <div class="form-group">
-                <label for="editEmail">Email:</label>
-                <input type="email" id="editEmail" name="email" required>
-              </div>
-              <div class="form-group">
-                <label for="editTelefone">Telefone:</label>
-                <input type="tel" id="editTelefone" name="telefone">
-              </div>
-              <div class="form-group">
-                <label for="editDataNascimento">Data de Nascimento:</label>
-                <input type="date" id="editDataNascimento" name="dataNascimento">
-              </div>
-              <div class="form-group">
-                <label for="editPosicao">Posição:</label>
-                <select id="editPosicao" name="posicao">
-                  <option value="" disabled selected>Selecione uma posição</option>
-                  <option value="Goleiro">Goleiro</option>
-                  <option value="Fixo">Fixo</option>
-                  <option value="Ala Esquerdo">Ala Esquerdo</option>
-                  <option value="Ala Direito">Ala Direito</option>
-                  <option value="Pivô">Pivô</option>
-                </select>
-              </div>
-              <div class="form-actions">
-                <button type="button" class="btn btn-primary" onclick="saveProfileChanges()">Salvar</button>
-                <button type="button" class="btn btn-secondary" onclick="cancelProfileEdit()">Cancelar</button>
-              </div>
-            </form>
-          </div>
-          
-          <div class="profile-actions">
-            <button class="btn btn-primary" id="editProfileBtn" onclick="enterEditMode()">Editar Perfil</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  
-  <div class="modal" id="confirmModal">
-      <div class="modal-box">
-          <div class="modal-header">
-              <h3 id="confirmTitle">Confirmar Ação</h3>
-              <button class="btn-close" onclick="closeModal('confirmModal')" aria-label="Fechar modal">×</button>
-          </div>
-          <div class="modal-content">
-              <p id="confirmMessage">Você tem certeza?</p>
-              <div class="form-actions" style="margin-top: 20px;">
-                  <button type="button" class="btn btn-primary" id="confirmBtn">Confirmar</button>
-                  <button type="button" class="btn btn-secondary" onclick="closeModal('confirmModal')">Cancelar</button>
-              </div>
-          </div>
-      </div>
-  </div>
-
-  <div class="modal" id="matchDetailsModal">
-    <div class="modal-box large">
-        <div class="modal-header">
-            <h3 id="modalMatchTitle">Detalhes da Partida</h3>
-            <button class="btn-close" onclick="closeModal('matchDetailsModal')" aria-label="Fechar modal">×</button>
-        </div>
-        <div class="modal-content" id="matchDetailsContent">
-            <p>Carregando detalhes...</p>
         </div>
     </div>
-</div>
 
-  <div id="toast-container"></div>
-  
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js" defer></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js" defer></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js" defer></script>
-  
-  <script src="js/firebase-config.js" defer></script>
-  <script src="js/utils.js" defer></script> 
-  <script src="js/auth_guard.js" defer></script> 
-  <script src="js/inicio.js" defer></script>
-  
-  <script>
-      (function(d){
-        var s = d.createElement("script");
-        s.setAttribute("data-account", "INSIRA_SEU_CÓDIGO_USERWAY_AQUI");
-        s.setAttribute("src", "https://cdn.userway.org/widget.js");
-        (d.body || d.head).appendChild(s);
-      })(document);
-  </script>
+    <div class="modal" id="matchDetailsModal">
+        <div class="modal-box large">
+            <div class="modal-header">
+                <h3 id="modalMatchTitle">Detalhes da Partida</h3>
+                <button class="btn-close" onclick="closeModal('matchDetailsModal')" aria-label="Fechar modal">×</button>
+            </div>
+            <div class="modal-content" id="matchDetailsContent"><p>Carregando detalhes...</p></div>
+        </div>
+    </div>
+
+    <div class="modal" id="notificationsModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Notificações</h3>
+                <button class="btn-close" onclick="closeModal('notificationsModal')" aria-label="Fechar modal">×</button>
+            </div>
+            <div class="modal-content" id="notifications-list"></div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+    <div id="loading" class="loading-overlay"></div>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js" defer></script>
+    <script src="js/firebase-config.js" defer></script>
+    <script src="js/utils.js" defer></script> 
+    <script src="js/auth_guard.js" defer></script> 
+    <script src="js/inicio.js" defer></script>
+    <script>
+        (function(d){
+            var s = d.createElement("script");
+            s.setAttribute("data-account", "INSIRA_SEU_CÓDIGO_USERWAY_AQUI");
+            s.setAttribute("src", "https://cdn.userway.org/widget.js");
+            (d.body || d.head).appendChild(s);
+        })(document);
+    </script>
 </body>
 </html>

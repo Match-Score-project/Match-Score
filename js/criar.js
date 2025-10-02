@@ -12,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const db = firebase.firestore();
     let currentUser = null;
 
-    // NOVO: Variáveis para controlar o modo de edição
     let isEditMode = false;
     let currentMatchId = null;
 
@@ -22,7 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
         dateInput: document.getElementById('data'),
         imageInput: document.getElementById('imagemPartidaInput'),
         imagePreview: document.getElementById('imagePreview'),
-        logo: document.querySelector('.form-header .logo'),
         pageTitle: document.querySelector('.form-header h2'),
         submitButton: document.querySelector('.submit-btn'),
         matchIdInput: document.getElementById('matchIdInput')
@@ -32,11 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
     auth.onAuthStateChanged(user => {
         if (user) {
             currentUser = user;
-            checkForEditMode(); // NOVO: Verifica se estamos em modo de edição
+            checkForEditMode();
         }
     });
 
-    // NOVO: Função para verificar a URL e entrar no modo de edição
     async function checkForEditMode() {
         const urlParams = new URLSearchParams(window.location.search);
         currentMatchId = urlParams.get('id');
@@ -45,11 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
             isEditMode = true;
             ui.matchIdInput.value = currentMatchId;
             
-            // Altera a UI para o modo de edição
             ui.pageTitle.textContent = 'Editar Partida';
             ui.submitButton.textContent = 'Salvar Alterações';
 
-            // Busca os dados da partida e preenche o formulário
             try {
                 const doc = await db.collection('partidas').doc(currentMatchId).get();
                 if (doc.exists) {
@@ -65,14 +60,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // NOVO: Função para preencher o formulário com dados existentes
     function fillFormWithMatchData(data) {
         ui.form.nome.value = data.nome || '';
         ui.form.data.value = data.data || '';
         ui.form.hora.value = data.hora || '';
         ui.form.local.value = data.local || '';
-        ui.form.tipo.value = data.tipo || '';
-        ui.form.jogadores.value = data.jogadoresPorTime || '';
+        ui.form.modalidade.value = data.modalidade || ''; // Campo renomeado
+        ui.form.tipo.value = data.tipo || ''; // Novo campo de quadra
+        ui.form.vagasTotais.value = data.vagasTotais || ''; 
         
         if (data.imagemURL) {
             ui.imagePreview.src = data.imagemURL;
@@ -100,25 +95,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ATUALIZADO: A função de salvar agora lida com criar e editar
     async function handleFormSubmit(event) {
         event.preventDefault();
         if (!currentUser) {
             return showToast("Você precisa estar logado.", "error");
         }
         
-        const formData = new FormData(ui.form);
+        // Usar os IDs corretos para pegar os valores
         const partida = {
-            nome: formData.get('nome'),
-            data: formData.get('data'),
-            hora: formData.get('hora'),
-            local: formData.get('local'),
-            tipo: formData.get('tipo'),
-            jogadoresPorTime: Number(formData.get('jogadores'))
+            nome: document.getElementById('nome').value,
+            data: document.getElementById('data').value,
+            hora: document.getElementById('hora').value,
+            local: document.getElementById('local').value,
+            modalidade: document.getElementById('modalidade').value, // Campo renomeado
+            tipo: document.getElementById('tipo').value,             // Novo campo
+            vagasTotais: Number(document.getElementById('vagasTotais').value)
         };
 
-        // Validação
-        if (!partida.nome || !partida.data || !partida.hora || !partida.local || !partida.tipo || !partida.jogadoresPorTime) {
+        if (!partida.nome || !partida.data || !partida.hora || !partida.local || !partida.modalidade || !partida.tipo || !partida.vagasTotais) {
             return showToast("Por favor, preencha todos os campos obrigatórios.", "error");
         }
 
@@ -131,12 +125,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (isEditMode) {
-                // MODO DE EDIÇÃO: Atualiza o documento existente
                 partida.atualizadoEm = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('partidas').doc(currentMatchId).update(partida);
                 showToast("Partida atualizada com sucesso!", "success");
             } else {
-                // MODO DE CRIAÇÃO: Adiciona um novo documento
                 partida.creatorId = currentUser.uid;
                 partida.creatorName = currentUser.displayName || 'Usuário Anônimo';
                 partida.criadoEm = firebase.firestore.FieldValue.serverTimestamp();

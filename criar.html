@@ -43,14 +43,7 @@
 
         <div class="form-group">
           <label for="local">Local</label>
-          <select id="local" name="local" required>
-            <option value="">Selecione o local</option>
-            <option value="Arena KF quadra">Arena KF (Quadra)</option>
-            <option value="Arena KS Society">Arena KS (Society)</option>
-            <option value="Quadra com Grama Sintética">Quadra com Grama Sintética</option>
-            <option value="Arena 22">Arena 22</option>
-            <option value="Quadra do Cambuí">Quadra do Cambuí</option>
-          </select>
+          <input type="text" id="local" name="local" required placeholder="Digite o endereço ou nome do local">
         </div>
 
         <div class="form-group image-upload-container">
@@ -64,18 +57,28 @@
 
         <div class="form-row">
           <div class="form-group">
-            <label for="tipo">Tipo de Partida</label>
-            <select id="tipo" name="tipo" required>
-              <option value="" disabled selected>Selecione</option>
-              <option value="amistoso">Amistoso</option>
-              <option value="campeonato">Campeonato</option>
-              <option value="treino">Treino</option>
+            <label for="modalidade">Tipo de Partida</label>
+            <select id="modalidade" name="modalidade" required>
+                <option value="" disabled selected>Selecione</option>
+                <option value="amistoso">Amistoso</option>
+                <option value="campeonato">Campeonato</option>
+                <option value="treino">Treino</option>
             </select>
           </div>
           <div class="form-group">
-            <label for="jogadores">Jogadores por time</label>
-            <input type="number" id="jogadores" name="jogadores" min="1" max="15" required>
+            <label for="tipo">Tipo de Quadra</label>
+            <select id="tipo" name="tipo" required>
+              <option value="" disabled selected>Selecione</option>
+              <option value="futsal">Futsal</option>
+              <option value="society">Society</option>
+              <option value="campo">Campo</option>
+            </select>
           </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="vagasTotais">Vagas Totais na Partida</label>
+            <input type="number" id="vagasTotais" name="vagasTotais" min="2" max="30" required placeholder="Ex: 14">
         </div>
 
         <div class="form-actions">

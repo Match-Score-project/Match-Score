@@ -10,8 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const auth = firebase.auth();
     const db = firebase.firestore();
-    const rtdb = firebase.database(); // NOVO: Referência ao Realtime Database
+    const rtdb = firebase.database();
     let currentUser = null;
+    let currentOpenMatchId = null; 
 
     const ui = {
         sidebar: document.getElementById('sidebar'),
@@ -36,13 +37,14 @@ document.addEventListener('DOMContentLoaded', () => {
         clearFiltersBtn: document.getElementById('clear-filters-btn'),
         friendsSearchBar: document.querySelector('#friends-content .search-bar'),
         friendsList: document.getElementById('friends-list'),
-        friendsTabs: document.querySelectorAll('#friends-content .tab')
+        friendsTabs: document.querySelectorAll('#friends-content .tab'),
+        inviteFriendsList: document.getElementById('invite-friends-list')
     };
 
     auth.onAuthStateChanged(user => {
         if (user) {
             currentUser = user;
-            managePresence(user); // NOVO: Ativa o gerenciador de presença
+            managePresence(user);
             loadUserProfile();
             fetchAndDisplayMatches();
             fetchAndDisplayMyMatches();
@@ -52,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // =================================================================================
-    // 2. LÓGICA DE PRESENÇA ONLINE (NOVO)
+    // 2. LÓGICA DE PRESENÇA ONLINE
     // =================================================================================
     function managePresence(user) {
         const userStatusRef = rtdb.ref('/status/' + user.uid);
@@ -90,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await fetchFriends();
         } else if (tabName === 'online') {
             ui.friendsSearchBar.style.display = 'none';
-            await fetchOnlineFriends(); // ATUALIZADO
+            await fetchOnlineFriends();
         } else if (tabName === 'pending') {
             ui.friendsSearchBar.style.display = 'none';
             await fetchFriendRequests();
@@ -134,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ui.friendsList.innerHTML = '';
             for (const friendId of onlineFriendIds) {
                 const userDoc = await db.collection('usuarios').doc(friendId).get();
-                if (userDoc.exists()) {
+                if (userDoc.exists) {
                     const userData = userDoc.data();
                     const friendHTML = `
                         <li class="friend-item">
@@ -434,10 +436,105 @@ document.addEventListener('DOMContentLoaded', () => {
             friendButton.textContent = 'Adicionar';
         }
     }
+
+    // =================================================================================
+    // LÓGICA DE CONVITE PARA PARTIDAS
+    // =================================================================================
+
+    async function showInviteFriendsModal(matchId) {
+        if (!matchId) return;
+        currentOpenMatchId = matchId;
+        openModal('inviteFriendsModal');
+        ui.inviteFriendsList.innerHTML = '<li class="friend-item-empty">Carregando amigos...</li>';
+
+        try {
+            const friendsPromise = db.collection('usuarios').doc(currentUser.uid).collection('amigos')
+                .where('status', '==', 'accepted').get();
+            
+            const playersPromise = db.collection('partidas').doc(matchId).collection('jogadores').get();
+
+            const [friendsSnapshot, playersSnapshot] = await Promise.all([friendsPromise, playersPromise]);
+
+            if (friendsSnapshot.empty) {
+                ui.inviteFriendsList.innerHTML = '<li class="friend-item-empty">Você não tem amigos para convidar.</li>';
+                return;
+            }
+
+            const playerIds = new Set(playersSnapshot.docs.map(doc => doc.id));
+            ui.inviteFriendsList.innerHTML = '';
+
+            for (const doc of friendsSnapshot.docs) {
+                const friendId = doc.id;
+                const friendData = doc.data();
+                const userDoc = await db.collection('usuarios').doc(friendId).get();
+                const userData = userDoc.data();
+
+                let buttonHTML;
+                if (playerIds.has(friendId)) {
+                    buttonHTML = `<button class="btn btn-secondary" disabled>Na Partida</button>`;
+                } else {
+                    buttonHTML = `<button class="btn btn-primary" id="invite-btn-${friendId}" onclick="sendMatchInvite('${friendId}', '${userData.nome}')">Convidar</button>`;
+                }
+
+                const friendHTML = `
+                    <li class="friend-item">
+                        <img src="${userData.fotoURL || 'imagens/perfil.png'}" alt="Avatar" class="friend-avatar">
+                        <div class="friend-info">
+                            <span class="friend-name">${friendData.amigoNome}</span>
+                        </div>
+                        <div class="friend-actions">
+                            ${buttonHTML}
+                        </div>
+                    </li>
+                `;
+                ui.inviteFriendsList.innerHTML += friendHTML;
+            }
+        } catch (error) {
+            console.error("Erro ao carregar lista de amigos para convite:", error);
+            ui.inviteFriendsList.innerHTML = '<li class="friend-item-empty">Erro ao carregar amigos.</li>';
+        }
+    }
+
+    async function sendMatchInvite(friendId, friendName) {
+        if (!currentUser || !friendId || !currentOpenMatchId) return;
+
+        const inviteButton = document.getElementById(`invite-btn-${friendId}`);
+        inviteButton.disabled = true;
+        inviteButton.textContent = 'Enviando...';
+
+        try {
+            const senderDoc = await db.collection('usuarios').doc(currentUser.uid).get();
+            const senderName = senderDoc.data().nome;
+
+            const matchDoc = await db.collection('partidas').doc(currentOpenMatchId).get();
+            const matchName = matchDoc.data().nome;
+
+            await db.collection('notificacoes').add({
+                userId: friendId,
+                message: `${senderName} te convidou para a partida "${matchName}"!`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                isRead: false,
+                type: 'match_invite',
+                matchId: currentOpenMatchId
+            });
+
+            showToast(`Convite enviado para ${friendName}!`, 'success');
+            inviteButton.textContent = 'Convidado';
+
+        } catch (error) {
+            console.error("Erro ao enviar convite:", error);
+            showToast("Erro ao enviar convite.", "error");
+            inviteButton.disabled = false;
+            inviteButton.textContent = 'Convidar';
+        }
+    }
+    
+    // =================================================================================
+    // LÓGICA DE NOTIFICAÇÕES (ATUALIZADA)
+    // =================================================================================
     
     async function fetchAndDisplayNotifications() {
         if (!currentUser || !ui.notificationsList) return;
-
         try {
             const snapshot = await db.collection('notificacoes')
                 .where('userId', '==', currentUser.uid)
@@ -462,26 +559,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const date = notification.timestamp ? notification.timestamp.toDate().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
                 
+                // NOVO: Adiciona um botão de ação se for um convite de partida
+                let actionButtonHTML = '';
+                if (notification.type === 'match_invite' && notification.matchId) {
+                    actionButtonHTML = `<button class="btn-notification-action" onclick="goToMatchRegistration('${notification.matchId}', event)">Inscrever-se</button>`;
+                }
+                
                 ui.notificationsList.innerHTML += `
                     <div class="notification-item ${!notification.isRead ? 'unread' : ''}" id="notif-${doc.id}">
                         <div class="notification-icon">💬</div>
                         <div class="notification-content">
                             <p>${notification.message}</p>
                             <span class="timestamp">${date}</span>
+                            ${actionButtonHTML}
                         </div>
                         <div class="notification-actions">
-                            <button class="btn-delete-notification" onclick="deleteNotification('${doc.id}')">&times;</button>
+                            <button class="btn-delete-notification" onclick="deleteNotification('${doc.id}'); event.stopPropagation();">&times;</button>
                         </div>
                     </div>
                 `;
             });
-
             ui.notificationDot.classList.toggle('visible', hasUnread);
-
         } catch (error) {
             console.error("Erro ao buscar notificações:", error);
-            ui.notificationsList.innerHTML = '<p>Erro ao carregar notificações. Verifique se o índice do Firestore foi criado.</p>';
+            ui.notificationsList.innerHTML = '<p>Erro ao carregar notificações.</p>';
         }
+    }
+
+    // NOVA FUNÇÃO para redirecionar para a página de cadastro
+    function goToMatchRegistration(matchId, event) {
+        event.stopPropagation(); // Impede que outros eventos de clique sejam acionados
+        if (!matchId) return showToast('ID da partida não encontrado.', 'error');
+        
+        closeModal('notificationsModal'); // Fecha o modal de notificações
+        
+        // Redireciona para a página de cadastro do jogador
+        window.location.href = `cadastrojogador.html?matchId=${matchId}`;
     }
 
     async function markNotificationsAsRead() {
@@ -522,8 +635,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // =================================================================================
+    // LÓGICA DE PARTIDAS
+    // =================================================================================
+
     async function openMatchDetails(matchId) {
         if (!matchId) return;
+        currentOpenMatchId = matchId;
         openModal('matchDetailsModal');
         ui.matchDetailsContent.innerHTML = '<p>Carregando detalhes da partida...</p>';
         ui.modalMatchTitle.textContent = 'Detalhes da Partida';
@@ -531,6 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const matchPromise = db.collection('partidas').doc(matchId).get();
             const playersPromise = db.collection('partidas').doc(matchId).collection('jogadores').orderBy('cadastradoEm').get();
             const [matchDoc, playersSnapshot] = await Promise.all([matchPromise, playersPromise]);
+
             if (!matchDoc.exists) {
                 ui.matchDetailsContent.innerHTML = '<p>Partida não encontrada.</p>';
                 return;
@@ -539,6 +658,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ui.modalMatchTitle.textContent = matchData.nome;
             const isCreator = currentUser && currentUser.uid === matchData.creatorId;
             let playersHTML = '';
+
             if (playersSnapshot.empty) {
                 playersHTML = '<p>Nenhum jogador cadastrado ainda.</p>';
             } else {
@@ -560,6 +680,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     `;
                 });
             }
+
             ui.matchDetailsContent.innerHTML = `
                 <div class="modal-match-info">
                     <p><strong>Data:</strong> ${formatDateToPtBr(matchData.data)} às ${matchData.hora}</p>
@@ -571,6 +692,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="player-list">
                         ${playersHTML}
                     </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" onclick="showInviteFriendsModal('${matchId}')">Convidar Amigos</button>
                 </div>
             `;
         } catch (error) {
@@ -836,6 +960,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+    
+    // =================================================================================
+    // FUNÇÕES GERAIS (MODAIS, UI, ETC.)
+    // =================================================================================
 
     function closeAllModals() {
         document.querySelectorAll('.modal.active').forEach(modal => {
@@ -1088,7 +1216,10 @@ document.addEventListener('DOMContentLoaded', () => {
         sendFriendRequest,
         acceptFriendRequest,
         declineFriendRequest,
-        removeFriend
+        removeFriend,
+        showInviteFriendsModal,
+        sendMatchInvite,
+        goToMatchRegistration // NOVA FUNÇÃO EXPOSTA
     });
     
     if (ui.friendsSearchBar) {

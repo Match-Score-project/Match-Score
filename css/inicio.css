@@ -1131,8 +1131,8 @@ body.light-mode .profile-info strong {
 .setting-option .switch {
     position: relative;
     display: inline-block;
-    width: 50px; /* Diminuído de 60px */
-    height: 28px; /* Diminuído de 34px */
+    width: 50px;
+    height: 28px;
 }
 
 .setting-option .switch input {
@@ -1150,14 +1150,14 @@ body.light-mode .profile-info strong {
     bottom: 0;
     background-color: var(--btn-secondary-bg);
     transition: .4s;
-    border-radius: 28px; /* Ajustado para a nova altura */
+    border-radius: 28px;
 }
 
 .setting-option .slider:before {
     position: absolute;
     content: "☀️";
-    height: 20px; /* Diminuído de 26px */
-    width: 20px; /* Diminuído de 26px */
+    height: 20px;
+    width: 20px;
     left: 4px;
     bottom: 4px;
     background-color: white;
@@ -1165,7 +1165,7 @@ body.light-mode .profile-info strong {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px; /* Diminuído de 16px */
+    font-size: 12px;
     color: #333;
     transition: .4s;
 }
@@ -1180,4 +1180,45 @@ body:not(.light-mode) .setting-option input:checked + .slider {
 .setting-option input:checked + .slider:before {
     transform: translateX(22px); 
     content: "🌙";
+}
+
+/* ============================================== */
+/* ESTILOS PARA FUNCIONALIDADE DE CONVITE         */
+/* ============================================== */
+
+.modal-actions {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+}
+
+#invite-friends-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.notification-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.btn-notification-action {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background-color: var(--primary);
+    color: var(--white);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: filter 0.2s;
+}
+
+.btn-notification-action:hover {
+    filter: brightness(1.2);
 }

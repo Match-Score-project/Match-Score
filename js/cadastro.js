@@ -58,106 +58,107 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     async function handleRegisterSubmit(event) {
-    event.preventDefault();
+        event.preventDefault();
 
-    const { nome, email, data, posicao, senha, csenha, telefone } = {
-        nome: ui.nomeInput.value.trim(),
-        email: ui.emailInput.value.trim(),
-        data: ui.dataInput.value,
-        posicao: ui.posicaoInput.value,
-        senha: ui.senhaInput.value,
-        csenha: ui.csenhaInput.value,
-        telefone: ui.telefoneInput.value.trim()
-    };
-
-    if (!nome || !email || !data || !posicao || !senha || !csenha || !telefone) {
-        return showToast("Por favor, preencha todos os campos.", "error");
-    }
-    if (senha !== csenha) {
-        return showToast("As senhas não coincidem.", "error");
-    }
-    if (senha.length < 6) {
-        return showToast("A senha deve ter no mínimo 6 caracteres.", "error");
-    }
-
-    toggleLoading(true);
-
-    try {
-        const currentUser = auth.currentUser;
-        let user;
-        let isGoogleUser = false;
-
-        if (currentUser && currentUser.providerData.some(p => p.providerId === 'google.com')) {
-            isGoogleUser = true;
-
-            // ===== INÍCIO DA CORREÇÃO =====
-            // Força a reautenticação para garantir que a sessão esteja "fresca"
-            const provider = new firebase.auth.GoogleAuthProvider();
-            await currentUser.reauthenticateWithPopup(provider);
-            // ===== FIM DA CORREÇÃO =====
-
-            const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, senha);
-            await currentUser.linkWithCredential(credential);
-            user = currentUser;
-
-        } else {
-            const userCredential = await auth.createUserWithEmailAndPassword(email, senha);
-            user = userCredential.user;
-        }
-
-        let imageToSave = null;
-        if (selectedProfileFile) {
-            imageToSave = await convertImageToBase64(selectedProfileFile);
-        } else if (googleProfilePhotoUrl) {
-            imageToSave = googleProfilePhotoUrl;
-        }
-
-        const userData = {
-            uid: user.uid,
-            nome,
-            email: user.email,
-            dataNascimento: data,
-            posicao: posicao,
-            telefone,
-            fotoURL: imageToSave || '',
-            googleV: isGoogleUser ? "Sim" : "Não",
-            criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        const { nome, email, data, posicao, senha, csenha, telefone } = {
+            nome: ui.nomeInput.value.trim(),
+            email: ui.emailInput.value.trim(),
+            data: ui.dataInput.value,
+            posicao: ui.posicaoInput.value,
+            senha: ui.senhaInput.value,
+            csenha: ui.csenhaInput.value,
+            telefone: ui.telefoneInput.value.trim()
         };
 
-        await db.collection('usuarios').doc(user.uid).set(userData, { merge: true });
-
-        showToast("Cadastro finalizado com sucesso!", "success");
-
-        setTimeout(() => {
-            window.location.href = 'entrar.html';
-        }, 1500);
-
-    } catch (error) {
-        console.error("Erro detalhado no cadastro:", error);
-        let message = "Ocorreu um erro ao cadastrar. Verifique o console para detalhes.";
-
-        if (error.code) {
-            switch (error.code) {
-                case 'auth/email-already-in-use':
-                case 'auth/credential-already-in-use':
-                    message = "Este e-mail já está cadastrado ou vinculado a outra conta.";
-                    break;
-                case 'auth/invalid-email':
-                    message = "O formato do e-mail é inválido.";
-                    break;
-                case 'auth/weak-password':
-                    message = "A senha é muito fraca. Use pelo menos 6 caracteres.";
-                    break;
-                default:
-                    message = `Erro do servidor: ${error.message}`;
-                    break;
-            }
+        if (!nome || !email || !data || !posicao || !senha || !csenha || !telefone) {
+            return showToast("Por favor, preencha todos os campos.", "error");
         }
-        showToast(message, "error");
-    } finally {
-        toggleLoading(false);
+        if (senha !== csenha) {
+            return showToast("As senhas não coincidem.", "error");
+        }
+        if (senha.length < 6) {
+            return showToast("A senha deve ter no mínimo 6 caracteres.", "error");
+        }
+
+        toggleLoading(true);
+
+        try {
+            const currentUser = auth.currentUser;
+            let user;
+            let isGoogleUser = false;
+
+            if (currentUser && currentUser.providerData.some(p => p.providerId === 'google.com')) {
+                isGoogleUser = true;
+
+                // A LINHA PROBLEMÁTICA FOI REMOVIDA DAQUI.
+                // Não vamos mais re-autenticar com o pop-up.
+                
+                const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, senha);
+                await currentUser.linkWithCredential(credential);
+                user = currentUser;
+
+            } else {
+                const userCredential = await auth.createUserWithEmailAndPassword(email, senha);
+                user = userCredential.user;
+            }
+
+            let imageToSave = null;
+            if (selectedProfileFile) {
+                imageToSave = await convertImageToBase64(selectedProfileFile);
+            } else if (googleProfilePhotoUrl) {
+                imageToSave = googleProfilePhotoUrl;
+            }
+
+            const userData = {
+                uid: user.uid,
+                nome,
+                nome_lowercase: nome.toLowerCase(),
+                email: user.email,
+                dataNascimento: data,
+                posicao: posicao,
+                telefone,
+                fotoURL: imageToSave || '',
+                googleV: isGoogleUser ? "Sim" : "Não",
+                criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            await db.collection('usuarios').doc(user.uid).set(userData, { merge: true });
+
+            showToast("Cadastro finalizado com sucesso!", "success");
+
+            setTimeout(() => {
+                window.location.href = 'entrar.html';
+            }, 1500);
+
+        } catch (error) {
+            console.error("Erro detalhado no cadastro:", error);
+            let message = "Ocorreu um erro ao cadastrar. Verifique o console para detalhes.";
+
+            if (error.code) {
+                switch (error.code) {
+                    case 'auth/email-already-in-use':
+                    case 'auth/credential-already-in-use':
+                        message = "Este e-mail já está cadastrado ou vinculado a outra conta.";
+                        break;
+                    case 'auth/invalid-email':
+                        message = "O formato do e-mail é inválido.";
+                        break;
+                    case 'auth/weak-password':
+                        message = "A senha é muito fraca. Use pelo menos 6 caracteres.";
+                        break;
+                    case 'auth/requires-recent-login':
+                        message = "Sua sessão expirou por segurança. Por favor, faça o login com Google novamente e preencha a senha.";
+                        break;
+                    default:
+                        message = `Erro do servidor: ${error.message}`;
+                        break;
+                }
+            }
+            showToast(message, "error");
+        } finally {
+            toggleLoading(false);
+        }
     }
-}
 
     async function handleGoogleSignIn() {
         if (auth.currentUser) await auth.signOut();

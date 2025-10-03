@@ -7,7 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const auth = firebase.auth();
     const db = firebase.firestore();
     let currentUser = null;
-    let currentMatchId = null; 
+    let currentMatchId = null;
+    let isEditMode = false; // Nova variável para controlar o modo de edição
 
     const ui = {
         playerForm: document.getElementById('playerForm'),
@@ -16,12 +17,13 @@ document.addEventListener('DOMContentLoaded', () => {
         positionText: document.getElementById('selected-position-text'),
         photoPreview: document.getElementById('photo-preview'),
         playerNameInput: document.getElementById('player-name'),
-        playerAgeInput: document.getElementById('player-age'), // Novo elemento
+        playerAgeInput: document.getElementById('player-age'),
         playerNicknameInput: document.getElementById('player-nickname'),
         matchInfoDisplay: document.getElementById('match-info-display'),
         fullMatchWarning: document.getElementById('full-match-warning'),
         submitBtn: document.getElementById('submit-btn'),
-        tooltip: document.getElementById('position-tooltip')
+        tooltip: document.getElementById('position-tooltip'),
+        pageTitle: document.querySelector('.main-container h2') // Elemento do título da página
     };
 
     // ==============================================
@@ -32,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUser = user;
             const urlParams = new URLSearchParams(window.location.search);
             currentMatchId = urlParams.get('matchId');
+            isEditMode = urlParams.get('edit') === 'true'; // Verifica se está em modo de edição
             
             if (!currentMatchId) {
                 showToast('Partida inválida. Redirecionando...', 'error');
@@ -44,21 +47,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function initializePage() {
         toggleLoading(true);
+
+        if (isEditMode) {
+            ui.pageTitle.textContent = 'Alterar sua Inscrição';
+            ui.submitBtn.textContent = 'Salvar Alterações';
+        }
+
         try {
             const matchPromise = db.collection('partidas').doc(currentMatchId).get();
             const playersPromise = db.collection('partidas').doc(currentMatchId).collection('jogadores').get();
             const userPromise = db.collection('usuarios').doc(currentUser.uid).get();
 
-            const [matchDoc, playersSnapshot, userDoc] = await Promise.all([matchPromise, playersPromise, userPromise]);
+            // Se estiver em modo de edição, busca também os dados da inscrição atual
+            const playerRegistrationPromise = isEditMode
+                ? db.collection('partidas').doc(currentMatchId).collection('jogadores').doc(currentUser.uid).get()
+                : Promise.resolve(null);
+
+            const [matchDoc, playersSnapshot, userDoc, playerRegDoc] = await Promise.all([
+                matchPromise, playersPromise, userPromise, playerRegistrationPromise
+            ]);
 
             if (userDoc.exists) {
-                const userData = userDoc.data();
-                populateFormWithUserData(userData); // Função principal para preencher os dados
+                populateFormWithUserData(userDoc.data());
+            }
+
+            if (isEditMode && playerRegDoc && playerRegDoc.exists) {
+                // Preenche o formulário com dados da inscrição (apelido e posição)
+                const registrationData = playerRegDoc.data();
+                ui.playerNicknameInput.value = registrationData.apelido || '';
+                if (registrationData.posicao) {
+                    selectPosition(registrationData.posicao);
+                }
             }
 
             if (!matchDoc.exists) {
-                showToast('Partida não encontrada.', 'error');
-                return;
+                showToast('Partida não encontrada.', 'error'); return;
             }
             const matchData = matchDoc.data();
             loadMatchInfo(matchData);
@@ -66,19 +89,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const maxPlayers = matchData.vagasTotais || 14; 
             const dynamicPositionLimit = Math.ceil(maxPlayers / 5); 
 
-            if (playersSnapshot.size >= maxPlayers) {
+            if (playersSnapshot.size >= maxPlayers && !isEditMode) { // Não bloqueia se estiver apenas editando
                 ui.fullMatchWarning.textContent = `Partida lotada! Limite de ${maxPlayers} jogadores atingido.`;
                 ui.fullMatchWarning.style.display = 'block';
                 ui.submitBtn.disabled = true;
                 ui.playerForm.style.opacity = '0.5';
             }
 
-            const positionCounts = { "Goleiro": 0, "Fixo": 0, "Ala Direita": 0, "Ala Esquerda": 0, "Pivô": 0 };
+            const positionCounts = {};
             playersSnapshot.forEach(doc => {
                 const position = doc.data().posicao;
-                if (position in positionCounts) {
-                    positionCounts[position]++;
-                }
+                positionCounts[position] = (positionCounts[position] || 0) + 1;
             });
             
             updateCourtUI(positionCounts, dynamicPositionLimit);
@@ -96,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==============================================
     function loadMatchInfo(data) {
         ui.matchInfoDisplay.innerHTML = `
-            <h3>Você está se inscrevendo em:</h3>
+            <h3>${isEditMode ? 'Você está alterando sua inscrição em:' : 'Você está se inscrevendo em:'}</h3>
             <p>${data.nome} (${data.local})</p>
         `;
     }
@@ -104,20 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function populateFormWithUserData(data) {
         ui.playerNameInput.value = data.nome || '';
         ui.photoPreview.src = data.fotoURL || 'imagens/perfil.png';
-        
-        // Calcula e preenche a idade
         if (data.dataNascimento) {
-            const age = calculateAge(data.dataNascimento);
-            ui.playerAgeInput.value = age;
-        }
-
-        // Pré-seleciona a posição se o usuário tiver uma definida no perfil
-        if (data.posicao) {
-            // Verifica se a posição do perfil ainda está disponível na partida
-            const prefferedPositionElement = document.querySelector(`.position[data-position="${data.posicao}"]`);
-            if (prefferedPositionElement && prefferedPositionElement.classList.contains('available')) {
-                selectPosition(data.posicao);
-            }
+            ui.playerAgeInput.value = calculateAge(data.dataNascimento);
         }
     }
     
@@ -126,36 +135,38 @@ document.addEventListener('DOMContentLoaded', () => {
             const positionName = pos.getAttribute('data-position');
             const currentCount = counts[positionName] || 0;
             const availableSlots = positionLimit - currentCount;
-
-            pos.classList.remove('available', 'unavailable');
-
-            if (availableSlots > 0) {
-                pos.classList.add('available');
-            } else {
-                pos.classList.add('unavailable');
+            
+            let isAvailable = availableSlots > 0;
+            // Se estiver editando, a posição atual do jogador também é considerada "disponível" para ele
+            if (isEditMode && ui.positionHiddenInput.value === positionName) {
+                isAvailable = true;
             }
 
+            pos.classList.remove('available', 'unavailable');
+            pos.classList.add(isAvailable ? 'available' : 'unavailable');
+            
             pos.onmousemove = (e) => {
                 ui.tooltip.style.left = e.pageX + 15 + 'px';
                 ui.tooltip.style.top = e.pageY + 15 + 'px';
             };
-            
             pos.onmouseenter = () => {
                 ui.tooltip.textContent = `${availableSlots > 0 ? availableSlots : 0} vaga(s) de ${positionLimit}`;
                 ui.tooltip.style.display = 'block';
             };
-
-            pos.onmouseleave = () => {
-                ui.tooltip.style.display = 'none';
-            };
+            pos.onmouseleave = () => { ui.tooltip.style.display = 'none'; };
         });
     }
 
     ui.positionElements.forEach(pos => {
         pos.addEventListener('click', () => {
             if (pos.classList.contains('unavailable')) {
-                showToast('Esta posição já está lotada!', 'error');
-                return;
+                // Permite clicar na própria posição se estiver editando
+                if (isEditMode && pos.getAttribute('data-position') === ui.positionHiddenInput.value) {
+                    // Não faz nada, apenas não mostra o erro
+                } else {
+                    showToast('Esta posição já está lotada!', 'error');
+                    return;
+                }
             }
             const positionName = pos.getAttribute('data-position');
             selectPosition(positionName);
@@ -172,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==============================================
-    // ENVIO DO FORMULÁRIO
+    // ENVIO DO FORMULÁRIO (CRIAR E ATUALIZAR)
     // ==============================================
     ui.playerForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -181,24 +192,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
         toggleLoading(true);
 
+        const playerData = {
+            userId: currentUser.uid,
+            nome: ui.playerNameInput.value,
+            apelido: ui.playerNicknameInput.value,
+            idade: ui.playerAgeInput.value,
+            posicao: ui.positionHiddenInput.value,
+            fotoURL: ui.photoPreview.src
+        };
+
         try {
-            const playerData = {
-                userId: currentUser.uid,
-                nome: ui.playerNameInput.value,
-                apelido: ui.playerNicknameInput.value,
-                idade: ui.playerAgeInput.value,
-                posicao: ui.positionHiddenInput.value,
-                cadastradoEm: firebase.firestore.FieldValue.serverTimestamp(),
-                fotoURL: ui.photoPreview.src // Pega a URL da foto já carregada
-            };
+            const playerDocRef = db.collection('partidas').doc(currentMatchId).collection('jogadores').doc(currentUser.uid);
             
-            await db.collection('partidas').doc(currentMatchId).collection('jogadores').doc(currentUser.uid).set(playerData);
-            showToast('Cadastro na partida realizado com sucesso!', 'success');
+            if (isEditMode) {
+                // Apenas atualiza os campos que podem ser mudados
+                await playerDocRef.update({
+                    apelido: playerData.apelido,
+                    posicao: playerData.posicao
+                });
+                showToast('Inscrição atualizada com sucesso!', 'success');
+            } else {
+                // Cria uma nova inscrição
+                playerData.cadastradoEm = firebase.firestore.FieldValue.serverTimestamp();
+                await playerDocRef.set(playerData);
+                showToast('Cadastro na partida realizado com sucesso!', 'success');
+            }
+            
             setTimeout(() => { window.location.href = 'inicio.html'; }, 1500);
 
         } catch (error) {
-            console.error("Erro ao cadastrar na partida:", error);
-            showToast('Erro ao realizar o cadastro.', 'error');
+            console.error("Erro ao salvar inscrição:", error);
+            showToast('Erro ao salvar inscrição.', 'error');
         } finally {
             toggleLoading(false);
         }
@@ -209,7 +233,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==============================================
     function calculateAge(birthdateString) {
         if (!birthdateString) return '';
-        // Adiciona um fuso horário para evitar problemas de "um dia a menos"
         const birthDate = new Date(birthdateString + 'T00:00:00');
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();

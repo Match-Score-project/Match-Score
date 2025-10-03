@@ -136,6 +136,12 @@ body {
     flex: 1;
 }
 
+.btn-success {
+    background-color: var(--success);
+    color: var(--white);
+    flex: 1;
+}
+
 /* ============================================== */
 /* 4. MENU LATERAL (SIDEBAR) E NOTIFICAÇÕES       */
 /* ============================================== */
@@ -377,7 +383,6 @@ body {
 /* ============================================== */
 /* 7. GRID DE PARTIDAS E CARDS                    */
 /* ============================================== */
-
 .btn-cadastrar-match {
     padding: 10px 16px;
     border-radius: 20px;
@@ -449,22 +454,28 @@ body {
 
 .match-card-actions { 
     display: flex; 
-    justify-content: space-between; 
+    justify-content: center;
     align-items: center; 
     gap: 10px; 
     margin-top: 15px; 
 } 
 
-#my-matches-grid .match-card-actions > div {
+#my-matches-grid .match-card-actions > div,
+#registered-matches-grid .match-card-actions > div {
     display: flex;
     flex-direction: column; 
     gap: 8px;
     width: 100%;
 }
 
-#my-matches-grid .match-card-actions .btn {
+#my-matches-grid .match-card-actions .btn,
+#registered-matches-grid .match-card-actions .btn {
     width: 100%;
     flex: unset;
+}
+
+#registered-matches-grid .match-card-actions > div {
+    flex-direction: row;
 }
 
 .btn-details { 
@@ -494,24 +505,24 @@ body {
 } 
 
 /* ============================================== */
-/* NOVO: FILTROS DE PARTIDAS                      */
+/* FILTROS DE PARTIDAS                            */
 /* ============================================== */
 .filters-container {
     display: flex;
     flex-wrap: wrap;
     gap: 16px;
-    background-color: var(--header-bg); /* Fundo um pouco diferente */
+    background-color: var(--header-bg);
     padding: 16px;
     border-radius: 8px;
     margin-bottom: 24px;
-    align-items: flex-end; /* Alinha todos os itens na base */
+    align-items: flex-end;
 }
 
 .filter-group {
     display: flex;
     flex-direction: column;
-    flex: 1; /* Faz os grupos crescerem para preencher o espaço */
-    min-width: 180px; /* Impede que fiquem muito pequenos */
+    flex: 1;
+    min-width: 180px;
 }
 
 .filter-group label {
@@ -531,10 +542,9 @@ body {
     background-color: var(--input-bg);
     color: var(--text);
     font-size: 0.9rem;
-    height: 41px; /* Altura fixa para alinhar com o botão */
+    height: 41px;
 }
 
-/* Estilo para o ícone do calendário no modo escuro */
 .filters-container input[type="date"]::-webkit-calendar-picker-indicator {
     filter: invert(0.8);
 }
@@ -551,7 +561,7 @@ body.light-mode .filters-container input[type="date"]::-webkit-calendar-picker-i
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    height: 41px; /* Mesma altura dos inputs */
+    height: 41px;
 }
 
 .btn-clear-filters:hover {
@@ -607,6 +617,28 @@ body.light-mode .filters-container input[type="date"]::-webkit-calendar-picker-i
     align-items: center; 
     margin-bottom: 16px; 
 } 
+
+.settings-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.setting-option {
+    position: relative;
+    height: 26px; 
+}
+
+.setting-option span {
+    line-height: 34px;
+}
+
+.setting-option .switch {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+}
 
 #confirmModal { 
     z-index: 1003; 
@@ -1091,4 +1123,61 @@ body.light-mode .profile-info strong {
 .sidebar-overlay.active {
     opacity: 1;
     pointer-events: auto;
+}
+
+/* ============================================== */
+/* 13. ESTILO DO BOTÃO DE TEMA (MODO ESCURO)      */
+/* ============================================== */
+.setting-option .switch {
+    position: relative;
+    display: inline-block;
+    width: 50px; /* Diminuído de 60px */
+    height: 28px; /* Diminuído de 34px */
+}
+
+.setting-option .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.setting-option .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--btn-secondary-bg);
+    transition: .4s;
+    border-radius: 28px; /* Ajustado para a nova altura */
+}
+
+.setting-option .slider:before {
+    position: absolute;
+    content: "☀️";
+    height: 20px; /* Diminuído de 26px */
+    width: 20px; /* Diminuído de 26px */
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px; /* Diminuído de 16px */
+    color: #333;
+    transition: .4s;
+}
+
+body.light-mode .setting-option input:checked + .slider {
+    background-color: var(--primary);
+}
+body:not(.light-mode) .setting-option input:checked + .slider {
+    background-color: var(--primary);
+}
+
+.setting-option input:checked + .slider:before {
+    transform: translateX(22px); 
+    content: "🌙";
 }

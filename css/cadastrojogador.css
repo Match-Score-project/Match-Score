@@ -182,9 +182,12 @@ h2 {
     transform: translate(-50%, -50%) scale(1.2);
 }
 
+/* ===== REGRA MODIFICADA ===== */
 .position.active {
     transform: translate(-50%, -50%) scale(1.3);
     border-color: var(--primary-color);
+    border-width: 3px; /* Aumenta a espessura da borda */
+    box-shadow: 0 0 12px var(--primary-color); /* Adiciona um brilho roxo */
 }
 
 .position.available {
@@ -251,7 +254,6 @@ h2 {
     transition: all 0.3s ease;
 }
 
-/* Adicionado para estilizar campos readonly */
 .form-group input[readonly] {
     background-color: #3a3a3a;
     color: var(--text-secondary);
@@ -274,7 +276,6 @@ h2 {
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* A propriedade 'gap' foi removida pois não há mais botão abaixo */
 }
 
 #photo-preview {
@@ -284,8 +285,6 @@ h2 {
     object-fit: cover;
     border: 3px solid var(--border-color);
 }
-
-/* O estilo do .upload-btn foi removido pois o botão não existe mais */
 
 .form-submit-btn {
     width: 100%;

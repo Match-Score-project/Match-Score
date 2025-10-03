@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const auth = firebase.auth();
     const db = firebase.firestore();
+    const rtdb = firebase.database(); // NOVO: Referência ao Realtime Database
     let currentUser = null;
 
     const ui = {
@@ -29,27 +30,411 @@ document.addEventListener('DOMContentLoaded', () => {
         modalMatchTitle: document.getElementById('modalMatchTitle'),
         notificationDot: document.getElementById('notificationDot'),
         notificationsList: document.getElementById('notifications-list'),
-        // Novos elementos para os filtros
         filterDate: document.getElementById('filter-date'),
         filterLocal: document.getElementById('filter-local'),
         filterType: document.getElementById('filter-type'),
-        clearFiltersBtn: document.getElementById('clear-filters-btn')
+        clearFiltersBtn: document.getElementById('clear-filters-btn'),
+        friendsSearchBar: document.querySelector('#friends-content .search-bar'),
+        friendsList: document.getElementById('friends-list'),
+        friendsTabs: document.querySelectorAll('#friends-content .tab')
     };
 
     auth.onAuthStateChanged(user => {
         if (user) {
             currentUser = user;
+            managePresence(user); // NOVO: Ativa o gerenciador de presença
             loadUserProfile();
-            fetchAndDisplayMatches(); // Busca inicial
+            fetchAndDisplayMatches();
             fetchAndDisplayMyMatches();
             fetchAndDisplayRegisteredMatches();
             fetchAndDisplayNotifications();
         }
     });
+
+    // =================================================================================
+    // 2. LÓGICA DE PRESENÇA ONLINE (NOVO)
+    // =================================================================================
+    function managePresence(user) {
+        const userStatusRef = rtdb.ref('/status/' + user.uid);
+
+        const isOfflineForDatabase = {
+            state: 'offline',
+            last_changed: firebase.database.ServerValue.TIMESTAMP,
+        };
+        const isOnlineForDatabase = {
+            state: 'online',
+            last_changed: firebase.database.ServerValue.TIMESTAMP,
+        };
+
+        rtdb.ref('.info/connected').on('value', (snapshot) => {
+            if (snapshot.val() === false) {
+                return;
+            }
+            
+            userStatusRef.onDisconnect().set(isOfflineForDatabase).then(() => {
+                userStatusRef.set(isOnlineForDatabase);
+            });
+        });
+    }
+
+    // =================================================================================
+    // 3. LÓGICA DE AMIGOS
+    // =================================================================================
     
-    // =================================================================================
-    // 2. LÓGICA DAS NOTIFICAÇÕES (sem alterações)
-    // =================================================================================
+    async function changeFriendsTab(tabName, element) {
+        ui.friendsTabs.forEach(tab => tab.classList.remove('active'));
+        element.classList.add('active');
+
+        if (tabName === 'all') {
+            ui.friendsSearchBar.style.display = 'block';
+            await fetchFriends();
+        } else if (tabName === 'online') {
+            ui.friendsSearchBar.style.display = 'none';
+            await fetchOnlineFriends(); // ATUALIZADO
+        } else if (tabName === 'pending') {
+            ui.friendsSearchBar.style.display = 'none';
+            await fetchFriendRequests();
+        }
+    }
+
+    async function fetchOnlineFriends() {
+        if (!currentUser) return;
+        ui.friendsList.innerHTML = '<li class="friend-item-empty">Verificando amigos online...</li>';
+
+        try {
+            const friendsSnapshot = await db.collection('usuarios').doc(currentUser.uid).collection('amigos')
+                .where('status', '==', 'accepted').get();
+
+            if (friendsSnapshot.empty) {
+                ui.friendsList.innerHTML = '<li class="friend-item-empty">Você não tem amigos para verificar o status.</li>';
+                return;
+            }
+
+            const friendIds = friendsSnapshot.docs.map(doc => doc.id);
+            const onlineFriendPromises = [];
+
+            for (const friendId of friendIds) {
+                const statusRef = rtdb.ref('/status/' + friendId);
+                const promise = statusRef.get().then(snapshot => {
+                    if (snapshot.exists() && snapshot.val().state === 'online') {
+                        return friendId;
+                    }
+                    return null;
+                });
+                onlineFriendPromises.push(promise);
+            }
+            
+            const onlineFriendIds = (await Promise.all(onlineFriendPromises)).filter(id => id !== null);
+
+            if (onlineFriendIds.length === 0) {
+                ui.friendsList.innerHTML = '<li class="friend-item-empty">Nenhum dos seus amigos está online.</li>';
+                return;
+            }
+
+            ui.friendsList.innerHTML = '';
+            for (const friendId of onlineFriendIds) {
+                const userDoc = await db.collection('usuarios').doc(friendId).get();
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    const friendHTML = `
+                        <li class="friend-item">
+                            <img src="${userData.fotoURL || 'imagens/perfil.png'}" alt="Avatar" class="friend-avatar">
+                            <div class="friend-info">
+                                <span class="friend-name">${userData.nome}</span>
+                                <span class="friend-status online">Online agora</span>
+                            </div>
+                        </li>
+                    `;
+                    ui.friendsList.innerHTML += friendHTML;
+                }
+            }
+
+        } catch (error) {
+            console.error("Erro ao buscar amigos online:", error);
+            ui.friendsList.innerHTML = '<li class="friend-item-empty">Ocorreu um erro ao verificar os amigos online.</li>';
+        }
+    }
+
+    async function fetchFriends() {
+        if (!currentUser) return;
+        ui.friendsList.innerHTML = '<li class="friend-item-empty">Carregando sua lista de amigos...</li>';
+        
+        try {
+            const friendsSnapshot = await db.collection('usuarios').doc(currentUser.uid).collection('amigos')
+                .where('status', '==', 'accepted')
+                .get();
+            
+            if (friendsSnapshot.empty) {
+                ui.friendsList.innerHTML = '<li class="friend-item-empty">Você ainda não tem amigos. Use a busca para adicionar.</li>';
+                return;
+            }
+
+            ui.friendsList.innerHTML = '';
+            for (const doc of friendsSnapshot.docs) {
+                const friendData = doc.data();
+                const friendId = doc.id;
+                
+                const userDoc = await db.collection('usuarios').doc(friendId).get();
+                const userData = userDoc.data();
+
+                const friendHTML = `
+                    <li class="friend-item" id="friend-${friendId}">
+                        <img src="${userData.fotoURL || 'imagens/perfil.png'}" alt="Avatar" class="friend-avatar">
+                        <div class="friend-info">
+                            <span class="friend-name">${friendData.amigoNome}</span>
+                        </div>
+                        <div class="friend-actions">
+                            <button class="btn btn-danger" onclick="removeFriend('${friendId}', '${friendData.amigoNome}')">Remover</button>
+                        </div>
+                    </li>
+                `;
+                ui.friendsList.innerHTML += friendHTML;
+            }
+        } catch (error) {
+            console.error("Erro ao buscar amigos:", error);
+            ui.friendsList.innerHTML = '<li class="friend-item-empty">Ocorreu um erro ao buscar sua lista de amigos.</li>';
+        }
+    }
+
+    function removeFriend(friendId, friendName) {
+        openConfirmModal('Remover Amigo', `Você tem certeza que quer remover ${friendName} da sua lista de amigos?`, async () => {
+            if (!currentUser) return;
+
+            const batch = db.batch();
+
+            const currentUserFriendRef = db.collection('usuarios').doc(currentUser.uid).collection('amigos').doc(friendId);
+            batch.delete(currentUserFriendRef);
+            
+            const friendUserRef = db.collection('usuarios').doc(friendId).collection('amigos').doc(currentUser.uid);
+            batch.delete(friendUserRef);
+            
+            try {
+                await batch.commit();
+                showToast(`${friendName} foi removido da sua lista de amigos.`, 'info');
+                const friendElement = document.getElementById(`friend-${friendId}`);
+                if (friendElement) friendElement.remove();
+
+                if (ui.friendsList.children.length === 0) {
+                     ui.friendsList.innerHTML = '<li class="friend-item-empty">Você ainda não tem amigos. Use a busca para adicionar.</li>';
+                }
+            } catch (error) {
+                console.error("Erro ao remover amigo:", error);
+                showToast("Ocorreu um erro ao remover o amigo.", "error");
+            }
+        });
+    }
+
+    async function fetchFriendRequests() {
+        if (!currentUser) return;
+        ui.friendsList.innerHTML = '<li class="friend-item-empty">Buscando solicitações...</li>';
+        
+        try {
+            const requestsSnapshot = await db.collection('usuarios').doc(currentUser.uid).collection('amigos')
+                .where('status', '==', 'pending_received')
+                .orderBy('timestamp', 'desc')
+                .get();
+            
+            if (requestsSnapshot.empty) {
+                ui.friendsList.innerHTML = '<li class="friend-item-empty">Nenhuma solicitação de amizade pendente.</li>';
+                return;
+            }
+
+            ui.friendsList.innerHTML = '';
+            for (const doc of requestsSnapshot.docs) {
+                const requestData = doc.data();
+                const friendId = doc.id;
+                
+                const userDoc = await db.collection('usuarios').doc(friendId).get();
+                const userData = userDoc.data();
+
+                const requestHTML = `
+                    <li class="friend-item" id="request-${friendId}">
+                        <img src="${userData.fotoURL || 'imagens/perfil.png'}" alt="Avatar" class="friend-avatar">
+                        <div class="friend-info">
+                            <span class="friend-name">${requestData.amigoNome}</span>
+                            <span class="friend-status">Enviou um pedido de amizade</span>
+                        </div>
+                        <div class="friend-actions">
+                            <button class="btn btn-success" onclick="acceptFriendRequest('${friendId}', '${requestData.amigoNome}')">Aceitar</button>
+                            <button class="btn btn-danger" onclick="declineFriendRequest('${friendId}')">Recusar</button>
+                        </div>
+                    </li>
+                `;
+                ui.friendsList.innerHTML += requestHTML;
+            }
+        } catch (error) {
+            console.error("Erro ao buscar solicitações:", error);
+            ui.friendsList.innerHTML = '<li class="friend-item-empty">Ocorreu um erro ao buscar solicitações.</li>';
+        }
+    }
+
+    async function acceptFriendRequest(friendId, friendName) {
+        if (!currentUser) return;
+
+        const currentUserId = currentUser.uid;
+        const currentUserDoc = await db.collection('usuarios').doc(currentUserId).get();
+        const currentUserName = currentUserDoc.data().nome;
+
+        const batch = db.batch();
+
+        const currentUserFriendRef = db.collection('usuarios').doc(currentUserId).collection('amigos').doc(friendId);
+        batch.update(currentUserFriendRef, { status: 'accepted' });
+
+        const friendUserRef = db.collection('usuarios').doc(friendId).collection('amigos').doc(currentUserId);
+        batch.update(friendUserRef, { status: 'accepted' });
+        
+        const notificationRef = db.collection('notificacoes').doc();
+        batch.set(notificationRef, {
+            userId: friendId,
+            message: `${currentUserName} aceitou seu pedido de amizade!`,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            isRead: false
+        });
+
+        try {
+            await batch.commit();
+            showToast(`Você e ${friendName} agora são amigos!`, 'success');
+            const requestElement = document.getElementById(`request-${friendId}`);
+            if (requestElement) requestElement.remove();
+            
+            if (ui.friendsList.children.length === 0) {
+                 ui.friendsList.innerHTML = '<li class="friend-item-empty">Nenhuma solicitação de amizade pendente.</li>';
+            }
+
+        } catch (error) {
+            console.error("Erro ao aceitar pedido:", error);
+            showToast("Ocorreu um erro ao aceitar o pedido.", "error");
+        }
+    }
+
+    async function declineFriendRequest(friendId) {
+        if (!currentUser) return;
+        const currentUserId = currentUser.uid;
+
+        const batch = db.batch();
+
+        const currentUserFriendRef = db.collection('usuarios').doc(currentUserId).collection('amigos').doc(friendId);
+        batch.delete(currentUserFriendRef);
+        
+        const friendUserRef = db.collection('usuarios').doc(friendId).collection('amigos').doc(currentUserId);
+        batch.delete(friendUserRef);
+        
+        try {
+            await batch.commit();
+            showToast('Solicitação recusada.', 'info');
+            const requestElement = document.getElementById(`request-${friendId}`);
+            if (requestElement) requestElement.remove();
+
+            if (ui.friendsList.children.length === 0) {
+                 ui.friendsList.innerHTML = '<li class="friend-item-empty">Nenhuma solicitação de amizade pendente.</li>';
+            }
+        } catch (error) {
+            console.error("Erro ao recusar pedido:", error);
+            showToast("Ocorreu um erro ao recusar o pedido.", "error");
+        }
+    }
+
+    async function handleFriendSearch(event) {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+
+        if (!currentUser || !ui.friendsSearchBar || !ui.friendsList) return;
+
+        const searchTerm = ui.friendsSearchBar.value.trim().toLowerCase();
+        
+        if (searchTerm.length === 0) {
+            fetchFriends();
+            return;
+        }
+
+        ui.friendsList.innerHTML = '<li class="friend-item-empty">Buscando...</li>';
+
+        if (searchTerm.length < 3) {
+            ui.friendsList.innerHTML = '<li class="friend-item-empty">Digite pelo menos 3 letras para buscar.</li>';
+            return;
+        }
+
+        try {
+            const searchQuery = db.collection('usuarios')
+                .where('nome_lowercase', '>=', searchTerm)
+                .where('nome_lowercase', '<=', searchTerm + '\uf8ff')
+                .limit(10);
+            
+            const snapshot = await searchQuery.get();
+
+            if (snapshot.empty) {
+                ui.friendsList.innerHTML = '<li class="friend-item-empty">Nenhum usuário encontrado.</li>';
+                return;
+            }
+
+            ui.friendsList.innerHTML = '';
+            for (const doc of snapshot.docs) {
+                if (doc.id === currentUser.uid) continue;
+
+                const userData = doc.data();
+                const userId = doc.id;
+
+                const userHTML = `
+                    <li class="friend-item">
+                        <img src="${userData.fotoURL || 'imagens/perfil.png'}" alt="Avatar" class="friend-avatar">
+                        <div class="friend-info">
+                            <span class="friend-name">${userData.nome}</span>
+                        </div>
+                        <div class="friend-actions">
+                            <button class="btn btn-primary" id="add-friend-${userId}" onclick="sendFriendRequest('${userId}', '${userData.nome}')">Adicionar</button>
+                        </div>
+                    </li>
+                `;
+                ui.friendsList.innerHTML += userHTML;
+            }
+
+        } catch (error) {
+            console.error("Erro ao buscar usuários:", error);
+            ui.friendsList.innerHTML = '<li class="friend-item-empty">Ocorreu um erro ao buscar. Verifique se o índice foi criado no Firestore.</li>';
+        }
+    }
+    
+    async function sendFriendRequest(receiverId, receiverName) {
+        if (!currentUser || !receiverId) return;
+
+        const senderId = currentUser.uid;
+        const senderDoc = await db.collection('usuarios').doc(senderId).get();
+        const senderName = senderDoc.data().nome;
+
+        const friendButton = document.getElementById(`add-friend-${receiverId}`);
+        friendButton.disabled = true;
+        friendButton.textContent = 'Enviando...';
+
+        try {
+            const batch = db.batch();
+
+            const senderRef = db.collection('usuarios').doc(senderId).collection('amigos').doc(receiverId);
+            batch.set(senderRef, { status: 'pending_sent', amigoNome: receiverName, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+
+            const receiverRef = db.collection('usuarios').doc(receiverId).collection('amigos').doc(senderId);
+            batch.set(receiverRef, { status: 'pending_received', amigoNome: senderName, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+
+            const notificationRef = db.collection('notificacoes').doc();
+            batch.set(notificationRef, {
+                userId: receiverId,
+                message: `${senderName} te enviou um pedido de amizade.`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                isRead: false
+            });
+
+            await batch.commit();
+            
+            showToast(`Pedido de amizade enviado para ${receiverName}!`, 'success');
+            friendButton.textContent = 'Enviado';
+
+        } catch (error) {
+            console.error("Erro ao enviar pedido de amizade:", error);
+            showToast("Erro ao enviar pedido.", "error");
+            friendButton.disabled = false;
+            friendButton.textContent = 'Adicionar';
+        }
+    }
+    
     async function fetchAndDisplayNotifications() {
         if (!currentUser || !ui.notificationsList) return;
 
@@ -137,9 +522,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // =================================================================================
-    // 3. LÓGICA DAS PARTIDAS
-    // =================================================================================
     async function openMatchDetails(matchId) {
         if (!matchId) return;
         openModal('matchDetailsModal');
@@ -246,16 +628,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // =================== FUNÇÃO MODIFICADA PARA FILTROS ===================
     async function fetchAndDisplayMatches() {
         if (!ui.allMatchesGrid) return;
         ui.allMatchesGrid.innerHTML = '<p>Carregando partidas...</p>';
-        // Limpa o carrossel apenas na busca inicial
         if (!ui.filterDate.value && !ui.filterLocal.value && !ui.filterType.value) {
              ui.carouselSlides.innerHTML = '';
         }
 
-        // 1. Pega os valores dos filtros
         const filterDate = ui.filterDate.value;
         const filterLocal = ui.filterLocal.value.toLowerCase().trim();
         const filterType = ui.filterType.value;
@@ -266,11 +645,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const day = String(today.getDate()).padStart(2, '0');
         const todayString = `${year}-${month}-${day}`;
         
-        // A data de início é a data do filtro, ou hoje, o que for mais recente
         const startDate = filterDate && filterDate > todayString ? filterDate : todayString;
 
         try {
-            // 2. Monta a query base no Firebase
             let query = db.collection('partidas').where('data', '>=', startDate);
 
             if (filterType) {
@@ -286,7 +663,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 allMatches.push({ id: doc.id, ...doc.data() });
             });
 
-            // 3. Aplica o filtro de local no lado do cliente (JavaScript)
             let filteredMatches = allMatches;
             if (filterLocal) {
                 filteredMatches = allMatches.filter(match => 
@@ -294,7 +670,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 );
             }
 
-            // 4. Exibe os resultados
             if (filteredMatches.length === 0) {
                 ui.allMatchesGrid.innerHTML = '<p>Nenhuma partida encontrada com os filtros selecionados.</p>';
             } else {
@@ -304,7 +679,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
             
-            // Atualiza o carrossel apenas na busca inicial (sem filtros)
             if (!ui.filterDate.value && !ui.filterLocal.value && !ui.filterType.value) {
                 const carouselMatches = filteredMatches.slice(0, 5);
                 ui.carouselSlides.innerHTML = '';
@@ -319,7 +693,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ui.allMatchesGrid.innerHTML = '<p>Erro ao carregar as partidas. Verifique se o índice do Firestore foi criado.</p>';
         }
     }
-    // ===================================================================
 
     async function fetchAndDisplayMyMatches() {
         if (!currentUser || !ui.myMatchesGrid) return;
@@ -406,8 +779,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h3>${match.nome}</h3>
                     <p>${formattedDate} - ${match.local}</p>
                     <div class="match-card-actions">
-                        <button class="btn-details" onclick="openMatchDetails('${matchId}')">Ver Detalhes</button>
-                        <button class="btn btn-danger" onclick="cancelarInscricao('${matchId}')">Cancelar</button>
+                        <div>
+                            <button class="btn btn-secondary" onclick="alterarInscricao('${matchId}')">Alterar</button>
+                            <button class="btn btn-danger" onclick="cancelarInscricao('${matchId}')">Cancelar</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -417,6 +792,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function cadastrarEmPartida(matchId) {
         if (!matchId) return showToast('ID da partida não encontrado.', 'error');
         window.location.href = `cadastrojogador.html?matchId=${matchId}`;
+    }
+    
+    function alterarInscricao(matchId) {
+        if (!matchId) return showToast('ID da partida não encontrado.', 'error');
+        window.location.href = `cadastrojogador.html?matchId=${matchId}&edit=true`;
     }
 
     function editMatch(matchId) {
@@ -457,9 +837,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // =================================================================================
-    // 4. CONTROLE DA UI (SIDEBAR, MODAIS, SEÇÕES) - sem alterações
-    // =================================================================================
     function closeAllModals() {
         document.querySelectorAll('.modal.active').forEach(modal => {
             if (modal.id !== 'confirmModal') {
@@ -528,14 +905,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const content = document.getElementById(`${sectionId}-content`);
         if (content) content.style.display = 'block';
+        
+        if(sectionId === 'friends') {
+            changeFriendsTab('all', ui.friendsTabs[0]);
+        }
+
         if (window.innerWidth <= 768 && ui.sidebar.classList.contains('open')) {
             toggleSidebar(false);
         }
     }
 
-    // =================================================================================
-    // 5. LÓGICA DO PERFIL DO USUÁRIO (sem alterações)
-    // =================================================================================
     async function loadUserProfile() {
         if (!currentUser) return;
         try {
@@ -583,8 +962,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function saveProfileChanges() {
         if (!currentUser) return;
+
+        const newName = document.getElementById('editNome').value.trim();
+
         const dataToUpdate = {
-            nome: document.getElementById('editNome').value.trim(),
+            nome: newName,
+            nome_lowercase: newName.toLowerCase(),
             email: document.getElementById('editEmail').value.trim(),
             telefone: document.getElementById('editTelefone').value.trim(),
             dataNascimento: document.getElementById('editDataNascimento').value,
@@ -624,9 +1007,6 @@ document.addEventListener('DOMContentLoaded', () => {
         event.target.value = '';
     }
 
-    // =================================================================================
-    // 6. LÓGICA DAS CONFIGURAÇÕES (sem alterações)
-    // =================================================================================
     function applyTheme(isDark) {
         document.body.classList.toggle('light-mode', !isDark);
         ui.themeToggle.checked = isDark;
@@ -651,10 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-
-    // =================================================================================
-    // 7. LÓGICA DO CARROSSEL (sem alterações)
-    // =================================================================================
+    
     function setupCarousel() {
         const slidesContainer = ui.carouselSlides;
         if (!slidesContainer || slidesContainer.children.length === 0) return;
@@ -684,18 +1061,12 @@ document.addEventListener('DOMContentLoaded', () => {
         atualizarCarousel();
     }
 
-    // =================================================================================
-    // 8. FUNÇÕES UTILITÁRIAS (sem alterações)
-    // =================================================================================
     function formatDateToPtBr(dateInput) {
         if (!dateInput) return '';
         const [year, month, day] = dateInput.split('-');
         return `${day}/${month}/${year}`;
     }
 
-    // =================================================================================
-    // 9. LISTENERS E FUNÇÕES GLOBAIS
-    // =================================================================================
     Object.assign(window, {
         toggleSidebar,
         openModal,
@@ -709,12 +1080,24 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteMatch,
         cadastrarEmPartida,
         cancelarInscricao,
+        alterarInscricao,
         openMatchDetails,
         removerJogador,
-        deleteNotification
+        deleteNotification,
+        changeFriendsTab, 
+        sendFriendRequest,
+        acceptFriendRequest,
+        declineFriendRequest,
+        removeFriend
     });
+    
+    if (ui.friendsSearchBar) {
+        ui.friendsSearchBar.addEventListener('keydown', handleFriendSearch);
+    }
 
-    // Adiciona os listeners para os filtros
+    if (ui.sidebarOverlay) {
+        ui.sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
+    }
     ui.filterDate.addEventListener('change', fetchAndDisplayMatches);
     ui.filterLocal.addEventListener('input', fetchAndDisplayMatches);
     ui.filterType.addEventListener('change', fetchAndDisplayMatches);

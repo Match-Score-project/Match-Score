@@ -74,6 +74,7 @@
                     </div>
                     <button id="clear-filters-btn" class="btn-clear-filters">Limpar</button>
                 </div>
+
                 <div class="all-matches-grid" id="all-matches-grid"></div>
             </section>
         </div>
@@ -82,10 +83,11 @@
              <section class="section">
                 <h2 class="section-title">Amigos</h2>
                 <input type="text" class="search-bar" placeholder="Buscar amigos...">
+                
                 <div class="tabs">
-                    <div class="tab active" onclick="changeFriendsTab('all')">Todos</div>
-                    <div class="tab" onclick="changeFriendsTab('online')">Online</div>
-                    <div class="tab" onclick="changeFriendsTab('pending')">Solicitações</div>
+                    <div class="tab active" onclick="changeFriendsTab('all', this)">Todos</div>
+                    <div class="tab" onclick="changeFriendsTab('online', this)">Online</div>
+                    <div class="tab" onclick="changeFriendsTab('pending', this)">Solicitações</div>
                 </div>
                 <ul class="friends-list" id="friends-list"></ul>
             </section>
@@ -230,6 +232,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js" defer></script>
     <script src="js/firebase-config.js" defer></script>
     <script src="js/utils.js" defer></script> 
     <script src="js/auth_guard.js" defer></script> 

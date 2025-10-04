@@ -7,7 +7,6 @@
     box-sizing: border-box;
 }
 
-/* ALTERAÇÕES PRINCIPAIS AQUI: Bloco de variáveis unificado */
 :root {
     --primary: #e81cff;
     --secondary: #4a00e0;
@@ -32,18 +31,17 @@ body.light-mode {
     --input-bg: #f9f9f9;
     --btn-secondary-bg: #e0e0e0;
     --text: #333333;
-    --text-secondary: #666666;
+    --text-secondary: #555555; /* Cor ajustada */
     --border-color: #dddddd;
     --shadow-color: rgba(0, 0, 0, 0.1);
 }
-/* FIM DAS ALTERAÇÕES */
 
 body {
     font-family: 'Roboto', sans-serif;
     margin: 0;
     padding: 0;
-    background-color: var(--bg); /* Usando nova variável */
-    color: var(--text); /* Usando nova variável */
+    background-color: var(--bg);
+    color: var(--text);
     transition: background-color 0.3s, color 0.3s;
     line-height: 1.6;
 }
@@ -62,8 +60,8 @@ body {
 
 .back-button {
     background-color: transparent;
-    color: var(--primary); /* Usando nova variável */
-    border: 2px solid var(--primary); /* Usando nova variável */
+    color: var(--primary);
+    border: 2px solid var(--primary);
     padding: 0.5rem 1rem;
     border-radius: 8px;
     cursor: pointer;
@@ -73,7 +71,7 @@ body {
 }
 
 .back-button:hover {
-    background-color: var(--primary); /* Usando nova variável */
+    background-color: var(--primary);
     color: white;
 }
 
@@ -108,26 +106,27 @@ h2 {
 .match-info-display {
     text-align: center;
     margin-bottom: 20px;
-    background-color: var(--input-bg);
+    background-color: var(--card-bg); /* Alterado para combinar com o resto */
     padding: 15px;
     border-radius: 8px;
+    border: 1px solid var(--border-color);
 }
 
 .match-info-display h3 {
-    margin: 0;
+    margin: 0 0 5px 0;
     color: var(--text-secondary);
     font-size: 1rem;
     font-weight: 500;
 }
 
 .match-info-display p {
-    margin: 5px 0;
+    margin: 0;
     font-size: 1.2rem;
     font-weight: bold;
     color: var(--text);
 }
 
-#full-match-warning, .full-warning { /* Unificando com o ID do seu JS */
+#full-match-warning, .full-warning {
     text-align: center;
     background-color: color-mix(in srgb, var(--danger-color) 15%, transparent);
     color: var(--danger-color);
@@ -160,7 +159,7 @@ h2 {
     box-shadow: 0 4px 8px var(--shadow-color);
 }
 
-#selected-position-container, .selected-position { /* Unificando com o ID do seu JS */
+#selected-position-container, .selected-position {
     text-align: center;
     padding: 10px;
     background-color: var(--card-bg);
@@ -170,9 +169,9 @@ h2 {
     margin-top: 10px;
 }
 
-#selected-position-text, .selected-position span { /* Unificando com o ID do seu JS */
+#selected-position-text, .selected-position span {
     color: var(--success-color);
-    font-weight: normal;
+    font-weight: bold; /* Alterado para bold para mais destaque */
 }
 
 .position {
@@ -185,7 +184,6 @@ h2 {
     border: 2px solid white;
     box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
     transform: translate(-50%, -50%);
-    background-color: #f1c40f;
 }
 
 .position:hover {
@@ -194,9 +192,9 @@ h2 {
 
 .position.active {
     transform: translate(-50%, -50%) scale(1.3);
-    border-color: var(--primary); /* Usando nova variável */
+    border-color: var(--primary);
     border-width: 3px;
-    box-shadow: 0 0 12px var(--primary); /* Usando nova variável */
+    box-shadow: 0 0 12px var(--primary);
 }
 
 .position.available {
@@ -214,8 +212,8 @@ h2 {
 .position-ala-e { top: 45%; left: 22%; }
 .position-piv { top: 25%; left: 50%; }
 
-#position-tooltip, .tooltip { /* Unificando com o ID do seu JS */
-    position: absolute;
+#position-tooltip, .tooltip {
+    position: fixed; /* Usar fixed para evitar problemas de overflow */
     background-color: rgba(0, 0, 0, 0.85);
     color: white;
     padding: 5px 10px;
@@ -264,15 +262,15 @@ h2 {
 }
 
 .form-group input[readonly] {
-    background-color: color-mix(in srgb, var(--text) 10%, var(--input-bg));
+    background-color: color-mix(in srgb, var(--text) 5%, var(--input-bg));
     color: var(--text-secondary);
-    cursor: not-allowed;
+    cursor: default; /* Alterado de not-allowed */
 }
 
 
 .form-group input:focus,
 .form-group select:focus {
-    border-color: var(--primary); /* Usando nova variável */
+    border-color: var(--primary);
     outline: none;
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
 }
@@ -295,10 +293,10 @@ h2 {
     border: 3px solid var(--border-color);
 }
 
-#submit-btn, .form-submit-btn { /* Unificando com o ID do seu JS */
+#submit-btn, .form-submit-btn {
     width: 100%;
     padding: 14px;
-    background: linear-gradient(45deg, var(--primary), var(--secondary)); /* Usando gradiente com variáveis */
+    background: linear-gradient(45deg, var(--primary), var(--secondary));
     color: white;
     border: none;
     border-radius: 8px;
@@ -316,6 +314,7 @@ h2 {
 .form-submit-btn:disabled {
     background: var(--text-secondary);
     cursor: not-allowed;
+    filter: brightness(0.7);
 }
 
 /* ============================================== */
@@ -356,23 +355,27 @@ h2 {
     }
 }
 
-.loading-overlay {
+
+/* === CÓDIGO DO LOADING CORRIGIDO AQUI === */
+#loading, .loading-overlay {
     position: fixed;
     top: 0;
     left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
+    background-color: rgba(0, 0, 0, 0.85);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 9999;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.3s ease-in-out;
 }
 
-.loading-overlay.visible {
+#loading.visible, .loading-overlay.visible {
     opacity: 1;
     pointer-events: auto;
 }
@@ -386,6 +389,8 @@ h2 {
     width: 100%;
     height: auto;
 }
+/* === FIM DA CORREÇÃO DO LOADING === */
+
 
 @media (max-width: 768px) {
     .content-container {

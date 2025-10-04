@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 <body>
     <button onclick="window.location.href='index.html'" aria-label="Voltar" class="back-button">←</button>
@@ -28,10 +30,15 @@
                     <input type="email" id="email" placeholder="Seu email" required aria-label="Email">
                 </div>
                 
-                <div class="form-group">
-                    <input type="password" id="senha" placeholder="Sua senha" required aria-label="Senha">
-                    <a href="#" id="recuperar-senha" class="recuperar-senha-link">Recuperar senha?</a>
+            <div class="form-group">
+                <div class="input-wrapper" style="position: relative; display: flex; align-items: center;">
+                    <input type="password" id="senha" placeholder="Sua senha" required aria-label="Senha" style="width: 100%;">
+            
+                    <i class="fa-solid fa-eye-slash" id="togglePassword"
+                        style="position: absolute; right: 15px; cursor: pointer; color: #717171;"></i>
                 </div>
+                <a href="#" id="recuperar-senha" class="recuperar-senha-link">Recuperar senha?</a>
+            </div>
                 <button type="submit" class="form-submit-btn">Entrar</button>
             </form>
 

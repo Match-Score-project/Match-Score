@@ -8,6 +8,8 @@
     <link rel="icon" href="imagens/loguinho2.png" type="image/png" />
     <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="manifest" href="manifest.json">
+     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 <body>
     <button onclick="window.location.href='index.html'" aria-label="Voltar" class="back-button">←</button>
@@ -47,14 +49,18 @@
                         <option value="Pivô">Pivô</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="senha">Senha</label>
-                    <input type="password" id="senha" name="senha" placeholder="Crie uma senha" required aria-required="true" minlength="6" />
-                </div>
-                <div class="form-group">
-                    <label for="Csenha">Confirmar Senha</label>
-                    <input type="password" id="Csenha" name="Csenha" placeholder="Confirme sua senha" required aria-required="true" minlength="6" />
-                </div>
+            <div class="form-group" style="position: relative;">
+                <label for="senha">Senha</label>
+                <input type="password" id="senha" placeholder="Crie uma senha forte" required>
+                <i class="fa-solid fa-eye-slash toggle-password"
+                    style="position: absolute; right: 15px; top: 65%; transform: translateY(-50%); cursor: pointer; color: #717171;"></i>
+            </div>
+            <div class="form-group" style="position: relative;">
+                <label for="Csenha">Confirmar Senha</label>
+                <input type="password" id="Csenha" placeholder="Confirme sua senha" required>
+                <i class="fa-solid fa-eye-slash toggle-password"
+                    style="position: absolute; right: 15px; top: 65%; transform: translateY(-50%); cursor: pointer; color: #717171;"></i>
+            </div>
                 <div class="form-group">
                     <label for="telefone">Telefone</label>
                     <input type="tel" id="telefone" name="telefone" placeholder="(DDD) + Número" required aria-required="true" pattern="\\(\\d{2}\\)\\s?\\d{4,5}-?\\d{4}" title="Formato esperado: (99) 99999-9999" />

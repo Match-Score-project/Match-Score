@@ -192,7 +192,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    ui.form.addEventListener('submit', handleRegisterSubmit);
+     ui.form.addEventListener('submit', handleRegisterSubmit);
     ui.profileImageInput.addEventListener('change', handleProfileImageChange);
     ui.googleSignInButton.addEventListener('click', handleGoogleSignIn);
+
+
+    // ==========================================================
+    // CÓDIGO PARA ADICIONAR ABAIXO
+    // ==========================================================
+
+    document.querySelectorAll('.toggle-password').forEach(toggle => {
+        toggle.addEventListener('click', () => {
+            // O input é o elemento "irmão" que vem logo antes do ícone no HTML
+            const passwordInput = toggle.previousElementSibling;
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            // Alterna as classes do ícone
+            toggle.classList.toggle('fa-eye');
+            toggle.classList.toggle('fa-eye-slash');
+        });
+    });
 });

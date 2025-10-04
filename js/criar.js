@@ -1,6 +1,10 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // ALTERAÇÃO APLICADA: Chama a função para aplicar o tema do usuário
+    if (typeof applyUserTheme === 'function') {
+        applyUserTheme();
+    }
 
     // 1. INICIALIZAÇÃO E VERIFICAÇÃO
     if (typeof firebase === 'undefined' || typeof showToast === 'undefined') {
@@ -65,8 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.form.data.value = data.data || '';
         ui.form.hora.value = data.hora || '';
         ui.form.local.value = data.local || '';
-        ui.form.modalidade.value = data.modalidade || ''; // Campo renomeado
-        ui.form.tipo.value = data.tipo || ''; // Novo campo de quadra
+        ui.form.modalidade.value = data.modalidade || '';
+        ui.form.tipo.value = data.tipo || '';
         ui.form.vagasTotais.value = data.vagasTotais || ''; 
         
         if (data.imagemURL) {
@@ -101,14 +105,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return showToast("Você precisa estar logado.", "error");
         }
         
-        // Usar os IDs corretos para pegar os valores
         const partida = {
             nome: document.getElementById('nome').value,
             data: document.getElementById('data').value,
             hora: document.getElementById('hora').value,
             local: document.getElementById('local').value,
-            modalidade: document.getElementById('modalidade').value, // Campo renomeado
-            tipo: document.getElementById('tipo').value,             // Novo campo
+            modalidade: document.getElementById('modalidade').value,
+            tipo: document.getElementById('tipo').value,
             vagasTotais: Number(document.getElementById('vagasTotais').value)
         };
 

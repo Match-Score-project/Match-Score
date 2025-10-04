@@ -65,21 +65,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await auth.signInWithPopup(provider);
             const user = result.user;
 
-            // Verifica se o usuário já existe no Firestore. Se não, cria um registro básico.
+            // Passo 1: Verifica se o usuário existe no SEU banco de dados
             const userDocRef = db.collection('usuarios').doc(user.uid);
             const doc = await userDocRef.get();
+
+            // Passo 2: Se o usuário NÃO existir, mostra um erro e desloga
             if (!doc.exists) {
-                await userDocRef.set({
-                    uid: user.uid,
-                    nome: user.displayName,
-                    email: user.email,
-                    fotoURL: user.photoURL,
-                    criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-                }, { merge: true });
+                showToast("Usuário não cadastrado. Crie uma conta antes de entrar.", "error");
+                await auth.signOut(); // Importante: Desloga o usuário do Firebase Auth
+                toggleLoading(false); // Esconde o loading
+                return; // Para a execução da função
             }
-            
+
+            // Passo 3: Se o usuário EXISTE, permite o login
             localStorage.setItem('isLoggedIn', 'true');
             window.location.href = 'inicio.html';
+
         } catch (error) {
             console.error("Erro no login com Google:", error);
             if (error.code !== 'auth/popup-closed-by-user') {
@@ -112,8 +113,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Adiciona os event listeners
+     // Adiciona os event listeners
     ui.loginForm.addEventListener('submit', handleEmailLogin);
     ui.googleSignInButton.addEventListener('click', handleGoogleLogin);
     ui.recoverPasswordLink.addEventListener('click', handlePasswordRecovery);
+
+
+    // ==========================================================
+    // CÓDIGO PARA ADICIONAR ABAIXO
+    // ==========================================================
+
+    const togglePassword = document.getElementById('togglePassword');
+    // Vamos usar a variável ui.senhaInput que você já declarou
+    if (togglePassword && ui.senhaInput) {
+        togglePassword.addEventListener('click', () => {
+            // Verifica o tipo atual e troca para o outro
+            const type = ui.senhaInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            ui.senhaInput.setAttribute('type', type);
+
+            // Alterna a classe do ícone para mudar de "olho fechado" para "olho aberto"
+            toggle.classList.toggle('fa-eye');
+            toggle.classList.toggle('fa-eye-slash');
+        });
+    }
 });

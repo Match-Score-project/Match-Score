@@ -1,6 +1,10 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (typeof applyUserTheme === 'function') {
+        applyUserTheme();
+    }
+    
     // ==============================================
     // INICIALIZAÇÃO E VARIÁVEIS
     // ==============================================
@@ -8,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const db = firebase.firestore();
     let currentUser = null;
     let currentMatchId = null;
-    let isEditMode = false; // Nova variável para controlar o modo de edição
+    let isEditMode = false;
 
     const ui = {
         playerForm: document.getElementById('playerForm'),
@@ -23,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fullMatchWarning: document.getElementById('full-match-warning'),
         submitBtn: document.getElementById('submit-btn'),
         tooltip: document.getElementById('position-tooltip'),
-        pageTitle: document.querySelector('.main-container h2') // Elemento do título da página
+        pageTitle: document.querySelector('.main-container h2')
     };
 
     // ==============================================
@@ -34,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUser = user;
             const urlParams = new URLSearchParams(window.location.search);
             currentMatchId = urlParams.get('matchId');
-            isEditMode = urlParams.get('edit') === 'true'; // Verifica se está em modo de edição
+            isEditMode = urlParams.get('edit') === 'true';
             
             if (!currentMatchId) {
                 showToast('Partida inválida. Redirecionando...', 'error');
@@ -58,7 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const playersPromise = db.collection('partidas').doc(currentMatchId).collection('jogadores').get();
             const userPromise = db.collection('usuarios').doc(currentUser.uid).get();
 
-            // Se estiver em modo de edição, busca também os dados da inscrição atual
             const playerRegistrationPromise = isEditMode
                 ? db.collection('partidas').doc(currentMatchId).collection('jogadores').doc(currentUser.uid).get()
                 : Promise.resolve(null);
@@ -72,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (isEditMode && playerRegDoc && playerRegDoc.exists) {
-                // Preenche o formulário com dados da inscrição (apelido e posição)
                 const registrationData = playerRegDoc.data();
                 ui.playerNicknameInput.value = registrationData.apelido || '';
                 if (registrationData.posicao) {
@@ -89,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const maxPlayers = matchData.vagasTotais || 14; 
             const dynamicPositionLimit = Math.ceil(maxPlayers / 5); 
 
-            if (playersSnapshot.size >= maxPlayers && !isEditMode) { // Não bloqueia se estiver apenas editando
+            if (playersSnapshot.size >= maxPlayers && !isEditMode) {
                 ui.fullMatchWarning.textContent = `Partida lotada! Limite de ${maxPlayers} jogadores atingido.`;
                 ui.fullMatchWarning.style.display = 'block';
                 ui.submitBtn.disabled = true;
@@ -137,7 +139,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const availableSlots = positionLimit - currentCount;
             
             let isAvailable = availableSlots > 0;
-            // Se estiver editando, a posição atual do jogador também é considerada "disponível" para ele
             if (isEditMode && ui.positionHiddenInput.value === positionName) {
                 isAvailable = true;
             }
@@ -160,9 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ui.positionElements.forEach(pos => {
         pos.addEventListener('click', () => {
             if (pos.classList.contains('unavailable')) {
-                // Permite clicar na própria posição se estiver editando
                 if (isEditMode && pos.getAttribute('data-position') === ui.positionHiddenInput.value) {
-                    // Não faz nada, apenas não mostra o erro
                 } else {
                     showToast('Esta posição já está lotada!', 'error');
                     return;
@@ -205,16 +204,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const playerDocRef = db.collection('partidas').doc(currentMatchId).collection('jogadores').doc(currentUser.uid);
             
             if (isEditMode) {
-                // Apenas atualiza os campos que podem ser mudados
                 await playerDocRef.update({
                     apelido: playerData.apelido,
                     posicao: playerData.posicao
                 });
                 showToast('Inscrição atualizada com sucesso!', 'success');
             } else {
-                // Cria uma nova inscrição
                 playerData.cadastradoEm = firebase.firestore.FieldValue.serverTimestamp();
                 await playerDocRef.set(playerData);
+                
+                const matchInfo = await db.collection('partidas').doc(currentMatchId).get();
+                sessionStorage.setItem('registrationSuccess', 'true');
+                sessionStorage.setItem('matchName', matchInfo.data().nome);
+
                 showToast('Cadastro na partida realizado com sucesso!', 'success');
             }
             

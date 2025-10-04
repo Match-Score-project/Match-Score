@@ -1,0 +1,19 @@
+{
+  "name": "Match Score",
+  "short_name": "Match Score",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#8A2BE2",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "imagens/loguinho.png",
+      "type": "image/png", "sizes": "192x192"
+    },
+    {
+      "src": "imagens/loguinho2.png",
+      "type": "image/png", "sizes": "512x512"
+    }
+  ]
+}

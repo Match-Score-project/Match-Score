@@ -8,6 +8,7 @@
     <link rel="icon" href="imagens/loguinho2.png" type="image/png">
     <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="manifest" href="manifest.json">
 </head>
 <body>
     <header class="app-header">
@@ -41,12 +42,12 @@
     <main class="content-wrapper">
         <div class="main-content page-section" id="home-content">
             <section>
-                <h2 class="section-title">Criações Recentes</h2>
-                <div class="carrossel">
+                <h2 class="section-title">Partidas Próximas</h2>
+                <div class="carrossel" style="position: relative;">
                     <div class="slides" id="slides"></div>
                     <div class="controles">
-                        <button id="btn-anterior" aria-label="Slide anterior">❮</button>
-                        <button id="btn-proximo" aria-label="Próximo slide">❯</button>
+                        <button id="btn-anterior" class="carousel-nav-btn" aria-label="Slide anterior">&#10094;</button>
+                        <button id="btn-proximo" class="carousel-nav-btn" aria-label="Próximo slide">&#10095;</button>
                     </div>
                 </div>
             </section>

@@ -1,6 +1,16 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Verifica se houve um cadastro bem-sucedido na sessão
+    if (sessionStorage.getItem('registrationSuccess') === 'true') {
+        const matchName = sessionStorage.getItem('matchName');
+        if (matchName) {
+            showToast(`Inscrição na partida "${matchName}" realizada com sucesso!`, 'success');
+        }
+        // Limpa os dados para não mostrar o aviso novamente
+        sessionStorage.removeItem('registrationSuccess');
+        sessionStorage.removeItem('matchName');
+    }
 
     // =================================================================================
     // 1. INICIALIZAÇÃO E VARIÁVEIS GLOBAIS
@@ -13,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const rtdb = firebase.database();
     let currentUser = null;
     let currentOpenMatchId = null; 
+    let registeredMatchIds = new Set(); // Guarda os IDs das partidas em que o usuário está inscrito
 
     const ui = {
         sidebar: document.getElementById('sidebar'),
@@ -41,11 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
         inviteFriendsList: document.getElementById('invite-friends-list')
     };
 
-    auth.onAuthStateChanged(user => {
+    auth.onAuthStateChanged(async (user) => {
         if (user) {
             currentUser = user;
             managePresence(user);
             loadUserProfile();
+            
+            await fetchUserRegistrations(); // Carrega as inscrições do usuário primeiro
+
             fetchAndDisplayMatches();
             fetchAndDisplayMyMatches();
             fetchAndDisplayRegisteredMatches();
@@ -54,25 +68,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // =================================================================================
-    // 2. LÓGICA DE PRESENÇA ONLINE
+    // FUNÇÕES DE DADOS (Inscrições, Presença, etc.)
     // =================================================================================
+    async function fetchUserRegistrations() {
+        if (!currentUser) return;
+        try {
+            const registrationsSnapshot = await db.collectionGroup('jogadores').where('userId', '==', currentUser.uid).get();
+            const ids = registrationsSnapshot.docs.map(doc => doc.ref.parent.parent.id);
+            registeredMatchIds = new Set(ids);
+        } catch (error) {
+            console.error("Erro ao buscar inscrições do usuário:", error);
+        }
+    }
+
     function managePresence(user) {
         const userStatusRef = rtdb.ref('/status/' + user.uid);
-
-        const isOfflineForDatabase = {
-            state: 'offline',
-            last_changed: firebase.database.ServerValue.TIMESTAMP,
-        };
-        const isOnlineForDatabase = {
-            state: 'online',
-            last_changed: firebase.database.ServerValue.TIMESTAMP,
-        };
+        const isOfflineForDatabase = { state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP };
+        const isOnlineForDatabase = { state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP };
 
         rtdb.ref('.info/connected').on('value', (snapshot) => {
-            if (snapshot.val() === false) {
-                return;
-            }
-            
+            if (snapshot.val() === false) return;
             userStatusRef.onDisconnect().set(isOfflineForDatabase).then(() => {
                 userStatusRef.set(isOnlineForDatabase);
             });
@@ -80,8 +95,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =================================================================================
-    // 3. LÓGICA DE AMIGOS
+    // LÓGICA DE AMIGOS
     // =================================================================================
+    
+    // ... (todas as funções de amigos: changeFriendsTab, fetchFriends, removeFriend, etc. permanecem aqui sem alteração) ...
     
     async function changeFriendsTab(tabName, element) {
         ui.friendsTabs.forEach(tab => tab.classList.remove('active'));
@@ -132,13 +149,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 ui.friendsList.innerHTML = '<li class="friend-item-empty">Nenhum dos seus amigos está online.</li>';
                 return;
             }
-
-            ui.friendsList.innerHTML = '';
-            for (const friendId of onlineFriendIds) {
+            
+            const onlineFriendsHtmlPromises = onlineFriendIds.map(async (friendId) => {
                 const userDoc = await db.collection('usuarios').doc(friendId).get();
                 if (userDoc.exists) {
                     const userData = userDoc.data();
-                    const friendHTML = `
+                    return `
                         <li class="friend-item">
                             <img src="${userData.fotoURL || 'imagens/perfil.png'}" alt="Avatar" class="friend-avatar">
                             <div class="friend-info">
@@ -147,9 +163,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </li>
                     `;
-                    ui.friendsList.innerHTML += friendHTML;
                 }
-            }
+                return '';
+            });
+
+            const onlineFriendsHtml = (await Promise.all(onlineFriendsHtmlPromises)).join('');
+            ui.friendsList.innerHTML = onlineFriendsHtml;
 
         } catch (error) {
             console.error("Erro ao buscar amigos online:", error);
@@ -171,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            ui.friendsList.innerHTML = '';
+            const friendsHtmlArray = [];
             for (const doc of friendsSnapshot.docs) {
                 const friendData = doc.data();
                 const friendId = doc.id;
@@ -190,9 +209,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </li>
                 `;
-                ui.friendsList.innerHTML += friendHTML;
+                friendsHtmlArray.push(friendHTML);
             }
-        } catch (error) {
+            ui.friendsList.innerHTML = friendsHtmlArray.join('');
+
+        } catch (error)
+        {
             console.error("Erro ao buscar amigos:", error);
             ui.friendsList.innerHTML = '<li class="friend-item-empty">Ocorreu um erro ao buscar sua lista de amigos.</li>';
         }
@@ -209,6 +231,17 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const friendUserRef = db.collection('usuarios').doc(friendId).collection('amigos').doc(currentUser.uid);
             batch.delete(friendUserRef);
+            
+            const currentUserDoc = await db.collection('usuarios').doc(currentUser.uid).get();
+            const currentUserName = currentUserDoc.data().nome;
+
+            const notificationRef = db.collection('notificacoes').doc();
+            batch.set(notificationRef, {
+                userId: friendId,
+                message: `${currentUserName} desfez a amizade com você.`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                isRead: false
+            });
             
             try {
                 await batch.commit();
@@ -241,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            ui.friendsList.innerHTML = '';
+            const requestsHtmlArray = [];
             for (const doc of requestsSnapshot.docs) {
                 const requestData = doc.data();
                 const friendId = doc.id;
@@ -262,8 +295,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </li>
                 `;
-                ui.friendsList.innerHTML += requestHTML;
+                requestsHtmlArray.push(requestHTML);
             }
+            ui.friendsList.innerHTML = requestsHtmlArray.join('');
+
         } catch (error) {
             console.error("Erro ao buscar solicitações:", error);
             ui.friendsList.innerHTML = '<li class="friend-item-empty">Ocorreu um erro ao buscar solicitações.</li>';
@@ -368,15 +403,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 ui.friendsList.innerHTML = '<li class="friend-item-empty">Nenhum usuário encontrado.</li>';
                 return;
             }
-
-            ui.friendsList.innerHTML = '';
-            for (const doc of snapshot.docs) {
-                if (doc.id === currentUser.uid) continue;
+            
+            const usersHtml = snapshot.docs.map(doc => {
+                if (doc.id === currentUser.uid) return ''; 
 
                 const userData = doc.data();
                 const userId = doc.id;
 
-                const userHTML = `
+                return `
                     <li class="friend-item">
                         <img src="${userData.fotoURL || 'imagens/perfil.png'}" alt="Avatar" class="friend-avatar">
                         <div class="friend-info">
@@ -387,8 +421,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </li>
                 `;
-                ui.friendsList.innerHTML += userHTML;
-            }
+            }).join('');
+            ui.friendsList.innerHTML = usersHtml;
 
         } catch (error) {
             console.error("Erro ao buscar usuários:", error);
@@ -436,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
             friendButton.textContent = 'Adicionar';
         }
     }
-
+    
     // =================================================================================
     // LÓGICA DE CONVITE PARA PARTIDAS
     // =================================================================================
@@ -461,8 +495,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const playerIds = new Set(playersSnapshot.docs.map(doc => doc.id));
-            ui.inviteFriendsList.innerHTML = '';
-
+            
+            const friendsHtmlArray = [];
             for (const doc of friendsSnapshot.docs) {
                 const friendId = doc.id;
                 const friendData = doc.data();
@@ -487,8 +521,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </li>
                 `;
-                ui.inviteFriendsList.innerHTML += friendHTML;
+                friendsHtmlArray.push(friendHTML);
             }
+            ui.inviteFriendsList.innerHTML = friendsHtmlArray.join('');
+
         } catch (error) {
             console.error("Erro ao carregar lista de amigos para convite:", error);
             ui.inviteFriendsList.innerHTML = '<li class="friend-item-empty">Erro ao carregar amigos.</li>';
@@ -530,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // =================================================================================
-    // LÓGICA DE NOTIFICAÇÕES (ATUALIZADA)
+    // LÓGICA DE NOTIFICAÇÕES
     // =================================================================================
     
     async function fetchAndDisplayNotifications() {
@@ -542,16 +578,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 .limit(20)
                 .get();
             
-            ui.notificationsList.innerHTML = '';
             let hasUnread = false;
 
             if (snapshot.empty) {
-                ui.notificationsList.innerHTML = '<p style="text-align: center; color: var(--light-gray);">Nenhuma notificação encontrada.</p>';
+                ui.notificationsList.innerHTML = '<p style="text-align: center; color: var(--light-gray);">Nenhuma notificação no momento.</p>';
                 ui.notificationDot.classList.remove('visible');
                 return;
             }
-
-            snapshot.forEach(doc => {
+            
+            const notificationsHtml = snapshot.docs.map(doc => {
                 const notification = doc.data();
                 if (!notification.isRead) {
                     hasUnread = true;
@@ -559,13 +594,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const date = notification.timestamp ? notification.timestamp.toDate().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
                 
-                // NOVO: Adiciona um botão de ação se for um convite de partida
                 let actionButtonHTML = '';
                 if (notification.type === 'match_invite' && notification.matchId) {
                     actionButtonHTML = `<button class="btn-notification-action" onclick="goToMatchRegistration('${notification.matchId}', event)">Inscrever-se</button>`;
                 }
                 
-                ui.notificationsList.innerHTML += `
+                return `
                     <div class="notification-item ${!notification.isRead ? 'unread' : ''}" id="notif-${doc.id}">
                         <div class="notification-icon">💬</div>
                         <div class="notification-content">
@@ -578,22 +612,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                 `;
-            });
+            }).join('');
+            
+            ui.notificationsList.innerHTML = notificationsHtml;
             ui.notificationDot.classList.toggle('visible', hasUnread);
+
         } catch (error) {
             console.error("Erro ao buscar notificações:", error);
             ui.notificationsList.innerHTML = '<p>Erro ao carregar notificações.</p>';
         }
     }
 
-    // NOVA FUNÇÃO para redirecionar para a página de cadastro
     function goToMatchRegistration(matchId, event) {
-        event.stopPropagation(); // Impede que outros eventos de clique sejam acionados
+        event.stopPropagation(); 
         if (!matchId) return showToast('ID da partida não encontrado.', 'error');
         
-        closeModal('notificationsModal'); // Fecha o modal de notificações
+        closeModal('notificationsModal'); 
         
-        // Redireciona para a página de cadastro do jogador
         window.location.href = `cadastrojogador.html?matchId=${matchId}`;
     }
 
@@ -626,7 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 elementToRemove.remove();
             }
             if (ui.notificationsList.children.length === 0) {
-                ui.notificationsList.innerHTML = '<p style="text-align: center; color: var(--light-gray);">Nenhuma notificação encontrada.</p>';
+                ui.notificationsList.innerHTML = '<p style="text-align: center; color: var(--light-gray);">Nenhuma notificação no momento.</p>';
             }
             showToast('Notificação excluída.', 'info');
         } catch (error) {
@@ -638,6 +673,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // =================================================================================
     // LÓGICA DE PARTIDAS
     // =================================================================================
+
+    function shareMatch(matchId, matchName) {
+        const url = `${window.location.origin}${window.location.pathname.replace('inicio.html', '')}cadastrojogador.html?matchId=${matchId}`;
+        navigator.clipboard.writeText(url).then(() => {
+            showToast(`Link para a partida "${matchName}" copiado!`, 'success');
+        }).catch(err => {
+            console.error('Erro ao copiar o link: ', err);
+            showToast('Não foi possível copiar o link.', 'error');
+        });
+    }
 
     async function openMatchDetails(matchId) {
         if (!matchId) return;
@@ -662,47 +707,53 @@ document.addEventListener('DOMContentLoaded', () => {
             if (playersSnapshot.empty) {
                 playersHTML = '<p>Nenhum jogador cadastrado ainda.</p>';
             } else {
-                playersSnapshot.forEach(playerDoc => {
+                playersHTML = playersSnapshot.docs.map(playerDoc => {
                     const playerData = playerDoc.data();
                     const playerId = playerDoc.id;
                     const removeButton = isCreator && playerId !== currentUser.uid ?
                         `<button class="btn-remove-player" onclick="removerJogador('${matchId}', '${playerId}', '${matchData.nome}')">×</button>` :
                         '';
-                    playersHTML += `
-                        <div class="player-item">
-                            <img src="${playerData.fotoURL || 'imagens/perfil.png'}" alt="Avatar" class="player-item-avatar">
-                            <div class="player-item-info">
-                                <span class="player-name">${playerData.nome}</span>
-                                <span class="player-position">${playerData.posicao}</span>
-                            </div>
-                            ${removeButton}
+                    return `
+                    <div class="player-item">
+                        <img src="${playerData.fotoURL || 'imagens/perfil.png'}" alt="Avatar" class="player-item-avatar">
+                        <div class="player-item-info">
+                            <span class="player-name">${playerData.nome}</span>
+                            <span class="player-position">${playerData.posicao}</span>
                         </div>
-                    `;
-                });
+                        ${removeButton}
+                    </div>
+                `;
+                }).join('');
             }
 
+            // A LINHA ABAIXO FOI A ÚNICA ALTERADA
+            const maxPlayers = matchData.vagasTotais || 'N/A'; // Garante que não dê erro se o campo não existir
+
             ui.matchDetailsContent.innerHTML = `
-                <div class="modal-match-info">
-                    <p><strong>Data:</strong> ${formatDateToPtBr(matchData.data)} às ${matchData.hora}</p>
-                    <p><strong>Local:</strong> ${matchData.local}</p>
-                    <p><strong>Tipo:</strong> ${matchData.tipo}</p>
+            <div class="modal-match-info">
+                <p><strong>Data:</strong> ${formatDateToPtBr(matchData.data)} às ${matchData.hora}</p>
+                <p><strong>Local:</strong> ${matchData.local}</p>
+                <p><strong>Tipo:</strong> ${matchData.tipo}</p>
+                <p><strong>Criador:</strong> ${matchData.creatorName || 'Não informado'}</p>
+            </div>
+            <div class="player-list-container">
+                <h4>Jogadores Confirmados (${playersSnapshot.size} de ${maxPlayers})</h4>
+                <div class="player-list">
+                    ${playersHTML}
                 </div>
-                <div class="player-list-container">
-                    <h4>Jogadores Confirmados (${playersSnapshot.size})</h4>
-                    <div class="player-list">
-                        ${playersHTML}
-                    </div>
-                </div>
-                <div class="modal-actions">
-                    <button class="btn btn-primary" onclick="showInviteFriendsModal('${matchId}')">Convidar Amigos</button>
-                </div>
-            `;
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="shareMatch('${matchId}', '${matchData.nome}')">Compartilhar</button>
+                <button class="btn btn-primary" onclick="showInviteFriendsModal('${matchId}')">Convidar Amigos</button>
+            </div>
+        `;
         } catch (error) {
             console.error("Erro ao buscar detalhes da partida:", error);
             ui.matchDetailsContent.innerHTML = '<p>Ocorreu um erro ao carregar os detalhes.</p>';
             showToast('Erro ao carregar detalhes.', 'error');
         }
     }
+
     
     async function removerJogador(matchId, playerId, matchName) {
         openConfirmModal('Remover Jogador', 'Você tem certeza?', async () => {
@@ -735,16 +786,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 ui.registeredMatchesGrid.innerHTML = '<p>Você não se cadastrou em nenhuma partida ainda.</p>';
                 return;
             }
-            ui.registeredMatchesGrid.innerHTML = '';
+
+            const registeredMatchesHtmlArray = [];
             for (const registrationDoc of playerRegistrations.docs) {
                 const matchRef = registrationDoc.ref.parent.parent;
                 const matchDoc = await matchRef.get();
                 if (matchDoc.exists) {
                     const matchData = matchDoc.data();
                     const matchId = matchDoc.id;
-                    ui.registeredMatchesGrid.innerHTML += createRegisteredMatchCard(matchData, matchId);
+                    registeredMatchesHtmlArray.push(createRegisteredMatchCard(matchData, matchId));
                 }
             }
+            ui.registeredMatchesGrid.innerHTML = registeredMatchesHtmlArray.join('');
+
         } catch (error) {
             console.error("Erro ao buscar jogos cadastrados:", error);
             ui.registeredMatchesGrid.innerHTML = '<p>Ocorreu um erro ao buscar seus jogos.</p>';
@@ -797,18 +851,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (filteredMatches.length === 0) {
                 ui.allMatchesGrid.innerHTML = '<p>Nenhuma partida encontrada com os filtros selecionados.</p>';
             } else {
-                ui.allMatchesGrid.innerHTML = '';
-                filteredMatches.forEach(match => {
-                    ui.allMatchesGrid.innerHTML += createMatchCard(match, match.id);
-                });
+                const matchesHTML = filteredMatches.map(match => createMatchCard(match, match.id)).join('');
+                ui.allMatchesGrid.innerHTML = matchesHTML;
             }
             
             if (!ui.filterDate.value && !ui.filterLocal.value && !ui.filterType.value) {
                 const carouselMatches = filteredMatches.slice(0, 5);
-                ui.carouselSlides.innerHTML = '';
-                carouselMatches.forEach(match => {
-                     ui.carouselSlides.innerHTML += createCarouselSlide(match, match.id);
-                });
+                const carouselHTML = carouselMatches.map(match => createCarouselSlide(match, match.id)).join('');
+                ui.carouselSlides.innerHTML = carouselHTML;
                 setupCarousel();
             }
 
@@ -821,18 +871,23 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchAndDisplayMyMatches() {
         if (!currentUser || !ui.myMatchesGrid) return;
         ui.myMatchesGrid.innerHTML = '<p>Carregando suas partidas...</p>';
+        
+        const today = new Date().toISOString().split('T')[0];
+
         try {
-            const snapshot = await db.collection('partidas').where('creatorId', '==', currentUser.uid).orderBy('criadoEm', 'desc').get();
+            const snapshot = await db.collection('partidas').where('creatorId', '==', currentUser.uid).where('data', '>=', today).orderBy('data', 'asc').get();
             if (snapshot.empty) {
-                ui.myMatchesGrid.innerHTML = '<p>Você ainda não criou nenhuma partida.</p>';
+                ui.myMatchesGrid.innerHTML = '<p>Você não tem nenhuma partida futura criada.</p>';
                 return;
             }
-            ui.myMatchesGrid.innerHTML = '';
-            snapshot.forEach(doc => {
+
+            const myMatchesHtml = snapshot.docs.map(doc => {
                 const match = doc.data();
                 const docId = doc.id;
-                ui.myMatchesGrid.innerHTML += createMyMatchCard(match, docId);
-            });
+                return createMyMatchCard(match, docId);
+            }).join('');
+            ui.myMatchesGrid.innerHTML = myMatchesHtml;
+
         } catch (error) {
             console.error("Erro ao buscar 'Minhas Partidas':", error);
             ui.myMatchesGrid.innerHTML = '<p>Erro ao carregar suas partidas.</p>';
@@ -841,16 +896,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function createMatchCard(match, matchId) {
         const formattedDate = formatDateToPtBr(match.data);
-        const imageUrl = match.imagemURL || 'imagens/campo.jpg';
+        const imageUrl = match.imagemURL || 'imagens/campo.jfif';
+        const creatorNameStyle = "font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 5px;";
+        
+        let actionButtonHTML;
+        if (registeredMatchIds.has(matchId)) {
+            actionButtonHTML = `<button class="btn btn-success" style="flex-grow: 1;" disabled>Inscrito</button>`;
+        } else {
+            actionButtonHTML = `<button class="btn-cadastrar-match" onclick="cadastrarEmPartida('${matchId}')">Cadastrar</button>`;
+        }
+
         return `
             <div class="match-card" data-match-id="${matchId}">
                 <img src="${imageUrl}" class="match-card-img" alt="Imagem da partida ${match.nome}">
                 <div class="match-card-content">
-                    <h3>${match.nome}</h3>
-                    <p>${formattedDate} - ${match.local}</p>
+                    <div>
+                        <h3>${match.nome}</h3>
+                        <p>${formattedDate} - ${match.local}</p>
+                        <div style="${creatorNameStyle}"><i class="fa-solid fa-user"></i> ${match.creatorName || ''}</div>
+                    </div>
                     <div class="match-card-actions">
                         <button class="btn-details" onclick="openMatchDetails('${matchId}')">Ver Detalhes</button>
-                        <button class="btn-cadastrar-match" onclick="cadastrarEmPartida('${matchId}')">Cadastrar</button>
+                        ${actionButtonHTML}
                     </div>
                 </div>
             </div>
@@ -858,29 +925,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createCarouselSlide(match, matchId) {
-        const imageUrl = match.imagemURL || 'imagens/campo.jpg';
-        const tipoPartida = match.tipo.charAt(0).toUpperCase() + match.tipo.slice(1);
-        return `
-            <div class="slide" data-match-id="${matchId}">
-                <img src="${imageUrl}" class="carrossel-img" alt="${match.nome}" onclick="openMatchDetails('${matchId}')">
-                <div class="slide-content">
-                    <h3 onclick="openMatchDetails('${matchId}')">${match.nome}</h3>
-                    <p>${tipoPartida} - ${match.local}</p>
-                    <button class="btn-cadastrar-match" onclick="cadastrarEmPartida('${matchId}')">Cadastrar</button>
-                </div>
-            </div>
-        `;
+    const imageUrl = match.imagemURL || 'imagens/campo.jfif';
+    const tipoPartida = match.tipo.charAt(0).toUpperCase() + match.tipo.slice(1);
+
+    let actionButtonHTML;
+    if (registeredMatchIds.has(matchId)) {
+        actionButtonHTML = `<button class="btn btn-success" disabled>Inscrito</button>`;
+    } else {
+        actionButtonHTML = `<button class="btn-cadastrar-match" onclick="cadastrarEmPartida('${matchId}')">Cadastrar</button>`;
     }
+
+    return `
+        <div class="slide" data-match-id="${matchId}">
+            <img src="${imageUrl}" class="carrossel-img" alt="${match.nome}" onclick="openMatchDetails('${matchId}')">
+            <div class="slide-content">
+                <h3 onclick="openMatchDetails('${matchId}')">${match.nome}</h3>
+                <p>${tipoPartida} - ${match.local}</p>
+                ${actionButtonHTML}
+            </div>
+        </div>
+    `;
+}
 
     function createMyMatchCard(match, matchId) {
         const formattedDate = formatDateToPtBr(match.data);
-        const imageUrl = match.imagemURL || 'imagens/campo.jpg';
+        const imageUrl = match.imagemURL || 'imagens/campo.jfif';
+        const creatorNameStyle = "font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 5px;";
+
         return `
             <div class="match-card" data-match-id="${matchId}">
                 <img src="${imageUrl}" class="match-card-img" alt="Imagem da partida ${match.nome}">
                 <div class="match-card-content">
-                    <h3>${match.nome}</h3>
-                    <p>${formattedDate} - ${match.local}</p>
+                    <div>
+                        <h3>${match.nome}</h3>
+                        <p>${formattedDate} - ${match.local}</p>
+                        <div style="${creatorNameStyle}"><i class="fa-solid fa-user"></i> ${match.creatorName || ''}</div>
+                    </div>
                     <div class="match-card-actions">
                         <button class="btn-details" onclick="openMatchDetails('${matchId}')">Ver Detalhes</button>
                         <div>
@@ -895,13 +975,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function createRegisteredMatchCard(match, matchId) {
         const formattedDate = formatDateToPtBr(match.data);
-        const imageUrl = match.imagemURL || 'imagens/campo.jpg';
+        const imageUrl = match.imagemURL || 'imagens/campo.jfif';
+        const creatorNameStyle = "font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 5px;";
+
         return `
             <div class="match-card" data-match-id="${matchId}">
                 <img src="${imageUrl}" class="match-card-img" alt="Imagem da partida ${match.nome}">
                 <div class="match-card-content">
-                    <h3>${match.nome}</h3>
-                    <p>${formattedDate} - ${match.local}</p>
+                    <div>
+                        <h3>${match.nome}</h3>
+                        <p>${formattedDate} - ${match.local}</p>
+                        <div style="${creatorNameStyle}"><i class="fa-solid fa-user"></i> ${match.creatorName || ''}</div>
+                    </div>
                     <div class="match-card-actions">
                         <div>
                             <button class="btn btn-secondary" onclick="alterarInscricao('${matchId}')">Alterar</button>
@@ -913,11 +998,30 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    function cadastrarEmPartida(matchId) {
-        if (!matchId) return showToast('ID da partida não encontrado.', 'error');
-        window.location.href = `cadastrojogador.html?matchId=${matchId}`;
+    async function cadastrarEmPartida(matchId) {
+        if (!matchId || !currentUser) {
+            return showToast('ID da partida ou usuário não encontrado.', 'error');
+        }
+
+        toggleLoading(true);
+
+        try {
+            const playerDocRef = db.collection('partidas').doc(matchId).collection('jogadores').doc(currentUser.uid);
+            const playerDoc = await playerDocRef.get();
+
+            if (playerDoc.exists) {
+                toggleLoading(false);
+                showToast('Você já está cadastrado nesta partida.', 'info');
+            } else {
+                window.location.href = `cadastrojogador.html?matchId=${matchId}`;
+            }
+        } catch (error) {
+            console.error("Erro ao verificar inscrição na partida:", error);
+            toggleLoading(false);
+            showToast('Ocorreu um erro ao verificar sua inscrição.', 'error');
+        }
     }
-    
+
     function alterarInscricao(matchId) {
         if (!matchId) return showToast('ID da partida não encontrado.', 'error');
         window.location.href = `cadastrojogador.html?matchId=${matchId}&edit=true`;
@@ -950,8 +1054,12 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleLoading(true);
             try {
                 await db.collection('partidas').doc(matchId).collection('jogadores').doc(currentUser.uid).delete();
-                showToast('Inscrição cancelada.', 'success');
+                
+                registeredMatchIds.delete(matchId);
                 fetchAndDisplayRegisteredMatches();
+                fetchAndDisplayMatches();
+                
+                showToast('Inscrição cancelada.', 'success');
             } catch (error) {
                 console.error('Erro ao cancelar inscrição:', error);
                 showToast('Erro ao cancelar.', 'error');
@@ -962,8 +1070,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // =================================================================================
-    // FUNÇÕES GERAIS (MODAIS, UI, ETC.)
+    // FUNÇÕES GERAIS (MODAIS, UI, FILTROS, ETC.)
     // =================================================================================
+    
+    function saveFiltersToLocalStorage() {
+        localStorage.setItem('matchScore_filterLocal', ui.filterLocal.value);
+        localStorage.setItem('matchScore_filterType', ui.filterType.value);
+    }
+
+    function loadFiltersFromLocalStorage() {
+        const savedLocal = localStorage.getItem('matchScore_filterLocal');
+        const savedType = localStorage.getItem('matchScore_filterType');
+
+        if (savedLocal) {
+            ui.filterLocal.value = savedLocal;
+        }
+        if (savedType) {
+            ui.filterType.value = savedType;
+        }
+    }
 
     function closeAllModals() {
         document.querySelectorAll('.modal.active').forEach(modal => {
@@ -1219,7 +1344,8 @@ document.addEventListener('DOMContentLoaded', () => {
         removeFriend,
         showInviteFriendsModal,
         sendMatchInvite,
-        goToMatchRegistration // NOVA FUNÇÃO EXPOSTA
+        goToMatchRegistration,
+        shareMatch
     });
     
     if (ui.friendsSearchBar) {
@@ -1229,13 +1355,29 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ui.sidebarOverlay) {
         ui.sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
     }
+
+    loadFiltersFromLocalStorage();
+    
     ui.filterDate.addEventListener('change', fetchAndDisplayMatches);
-    ui.filterLocal.addEventListener('input', fetchAndDisplayMatches);
-    ui.filterType.addEventListener('change', fetchAndDisplayMatches);
+    
+    ui.filterLocal.addEventListener('input', () => {
+        fetchAndDisplayMatches();
+        saveFiltersToLocalStorage();
+    });
+
+    ui.filterType.addEventListener('change', () => {
+        fetchAndDisplayMatches();
+        saveFiltersToLocalStorage();
+    });
+
     ui.clearFiltersBtn.addEventListener('click', () => {
         ui.filterDate.value = '';
         ui.filterLocal.value = '';
         ui.filterType.value = '';
+        
+        localStorage.removeItem('matchScore_filterLocal');
+        localStorage.removeItem('matchScore_filterType');
+
         fetchAndDisplayMatches();
     });
 

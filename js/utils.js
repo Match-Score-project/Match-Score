@@ -49,3 +49,30 @@ function convertImageToBase64(file) {
         reader.onerror = error => reject(error);
     });
 }
+/**
+ * Carrega o tema do usuário do Firestore e o aplica à página.
+ */
+async function applyUserTheme() {
+    // Garante que o Firebase e o Auth estejam prontos
+    firebase.auth().onAuthStateChanged(user => {
+        if (user) {
+            const db = firebase.firestore();
+            db.collection('usuarios').doc(user.uid).get().then(doc => {
+                if (doc.exists) {
+                    const userData = doc.data();
+                    
+                    // LÓGICA CORRIGIDA ABAIXO
+                    if (userData.theme === 'light') {
+                        // Se o tema for 'light', ADICIONA a classe
+                        document.body.classList.add('light-mode');
+                    } else {
+                        // Caso contrário (se for 'dark' ou indefinido), REMOVE a classe
+                        document.body.classList.remove('light-mode');
+                    }
+                }
+            }).catch(error => {
+                console.error("Erro ao buscar tema do usuário:", error);
+            });
+        }
+    });
+}

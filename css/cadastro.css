@@ -284,3 +284,18 @@ body {
         transform: translateY(-20px);
     }
 }
+
+.form-group select:hover {
+    /* Evita o fundo branco, usando uma cor mais clara do tema escuro */
+    background-color: #3a3a3a;
+}
+
+.form-group select {
+    /* Força a seta do dropdown a usar a cor primária do seu tema */
+    accent-color: var(--primary);
+}
+
+/* Para o tema claro, garantimos que a seta também use a cor primária */
+body.light-mode .form-group select {
+    accent-color: var(--primary);
+}

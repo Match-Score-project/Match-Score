@@ -46,6 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             initializePage();
+        } else {
+            // Se o usuário não estiver logado, redireciona para a página de entrada.
+            window.location.href = 'entrar.html';
         }
     });
 
@@ -162,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pos.addEventListener('click', () => {
             if (pos.classList.contains('unavailable')) {
                 if (isEditMode && pos.getAttribute('data-position') === ui.positionHiddenInput.value) {
+                     // Permite clicar na própria posição mesmo que esteja cheia para desselecionar
                 } else {
                     showToast('Esta posição já está lotada!', 'error');
                     return;

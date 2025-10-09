@@ -2,6 +2,7 @@
   "name": "Match Score",
   "short_name": "Match Score",
   "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#8A2BE2",
@@ -16,5 +17,4 @@
       "type": "image/png", "sizes": "512x512"
     }
   ]
-
 }

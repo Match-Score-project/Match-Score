@@ -1,13 +1,19 @@
 'use strict';
 
+/**
+ * @fileoverview Script principal da aplicação (inicio.html).
+ * Gerencia a exibição de partidas, perfil do usuário, configurações,
+ * amigos, notificações e todas as interações principais da dashboard.
+ */
 document.addEventListener('DOMContentLoaded', () => {
-    // Verifica se houve um cadastro bem-sucedido na sessão
+    // Exibe um toast de sucesso se o usuário acabou de se inscrever em uma partida.
+    // A informação é passada da página 'cadastrojogador.html' através da sessionStorage.
     if (sessionStorage.getItem('registrationSuccess') === 'true') {
         const matchName = sessionStorage.getItem('matchName');
         if (matchName) {
             showToast(`Inscrição na partida "${matchName}" realizada com sucesso!`, 'success');
         }
-        // Limpa os dados para não mostrar o aviso novamente
+        // Limpa os dados da sessão para não mostrar o aviso novamente em um futuro refresh.
         sessionStorage.removeItem('registrationSuccess');
         sessionStorage.removeItem('matchName');
     }
@@ -20,11 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const auth = firebase.auth();
     const db = firebase.firestore();
-    const rtdb = firebase.database();
+    const rtdb = firebase.database(); // Realtime Database para o status de presença (online/offline)
+    
     let currentUser = null;
-    let currentOpenMatchId = null; 
-    let registeredMatchIds = new Set(); // Guarda os IDs das partidas em que o usuário está inscrito
+    let currentOpenMatchId = null; // Armazena o ID da partida atualmente aberta no modal de detalhes
+    let registeredMatchIds = new Set(); // Conjunto para armazenar IDs das partidas em que o usuário está inscrito. Usar Set é mais eficiente para buscas.
 
+    // Mapeamento centralizado de todos os elementos da UI para fácil acesso e manutenção.
     const ui = {
         sidebar: document.getElementById('sidebar'),
         sidebarOverlay: document.getElementById('sidebar-overlay'),
@@ -52,14 +60,20 @@ document.addEventListener('DOMContentLoaded', () => {
         inviteFriendsList: document.getElementById('invite-friends-list')
     };
 
+    /**
+     * Observador de autenticação. É o ponto de partida de toda a lógica da página.
+     * Executa as funções principais assim que o estado do usuário (logado/deslogado) é confirmado.
+     */
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             currentUser = user;
-            managePresence(user);
+            managePresence(user); // Ativa o status "online"
             loadUserProfile();
             
-            await fetchUserRegistrations(); // Carrega as inscrições do usuário primeiro
+            // É importante carregar as inscrições do usuário primeiro para que os botões "Inscrever-se"/"Inscrito" sejam exibidos corretamente.
+            await fetchUserRegistrations(); 
 
+            // Carrega as diferentes seções da página.
             fetchAndDisplayMatches();
             fetchAndDisplayMyMatches();
             fetchAndDisplayRegisteredMatches();
@@ -68,38 +82,55 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // =================================================================================
-    // FUNÇÕES DE DADOS (Inscrições, Presença, etc.)
+    // 2. FUNÇÕES DE DADOS (Inscrições, Presença, etc.)
     // =================================================================================
+    
+    /**
+     * Busca no Firestore todas as partidas em que o usuário está inscrito (usando collectionGroup)
+     * e armazena os IDs no conjunto 'registeredMatchIds' para consulta rápida.
+     */
     async function fetchUserRegistrations() {
         if (!currentUser) return;
         try {
+            // collectionGroup('jogadores') busca em todas as subcoleções 'jogadores' de todas as 'partidas'.
             const registrationsSnapshot = await db.collectionGroup('jogadores').where('userId', '==', currentUser.uid).get();
-            const ids = registrationsSnapshot.docs.map(doc => doc.ref.parent.parent.id);
+            const ids = registrationsSnapshot.docs.map(doc => doc.ref.parent.parent.id); // Pega o ID da partida (documento pai do pai)
             registeredMatchIds = new Set(ids);
         } catch (error) {
             console.error("Erro ao buscar inscrições do usuário:", error);
         }
     }
 
+    /**
+     * Gerencia o status de presença (online/offline) do usuário usando o Realtime Database.
+     * @param {firebase.User} user - O objeto do usuário autenticado.
+     */
     function managePresence(user) {
         const userStatusRef = rtdb.ref('/status/' + user.uid);
         const isOfflineForDatabase = { state: 'offline', last_changed: firebase.database.ServerValue.TIMESTAMP };
         const isOnlineForDatabase = { state: 'online', last_changed: firebase.database.ServerValue.TIMESTAMP };
 
         rtdb.ref('.info/connected').on('value', (snapshot) => {
-            if (snapshot.val() === false) return;
+            if (snapshot.val() === false) return; // Se o cliente não estiver conectado à internet, não faz nada.
+            
+            // onDisconnect() define uma ação a ser executada quando o cliente se desconectar.
+            // Aqui, definimos que o status deve ser 'offline'.
             userStatusRef.onDisconnect().set(isOfflineForDatabase).then(() => {
+                // Se a ação onDisconnect for definida com sucesso, definimos o status atual como 'online'.
                 userStatusRef.set(isOnlineForDatabase);
             });
         });
     }
 
     // =================================================================================
-    // LÓGICA DE AMIGOS
+    // 3. LÓGICA DE AMIGOS E SOCIAL
     // =================================================================================
     
-    // ... (todas as funções de amigos: changeFriendsTab, fetchFriends, removeFriend, etc. permanecem aqui sem alteração) ...
-    
+    /**
+     * Altera a aba visível na seção de amigos (Todos, Online, Solicitações).
+     * @param {string} tabName - O nome da aba a ser exibida.
+     * @param {HTMLElement} element - O elemento da aba que foi clicado.
+     */
     async function changeFriendsTab(tabName, element) {
         ui.friendsTabs.forEach(tab => tab.classList.remove('active'));
         element.classList.add('active');
@@ -115,14 +146,17 @@ document.addEventListener('DOMContentLoaded', () => {
             await fetchFriendRequests();
         }
     }
-
+    
+    /**
+     * Busca e exibe os amigos do usuário que estão atualmente online.
+     */
     async function fetchOnlineFriends() {
         if (!currentUser) return;
         ui.friendsList.innerHTML = '<li class="friend-item-empty">Verificando amigos online...</li>';
 
         try {
-            const friendsSnapshot = await db.collection('usuarios').doc(currentUser.uid).collection('amigos')
-                .where('status', '==', 'accepted').get();
+            // Busca os amigos aceitos no Firestore
+            const friendsSnapshot = await db.collection('usuarios').doc(currentUser.uid).collection('amigos').where('status', '==', 'accepted').get();
 
             if (friendsSnapshot.empty) {
                 ui.friendsList.innerHTML = '<li class="friend-item-empty">Você não tem amigos para verificar o status.</li>';
@@ -132,17 +166,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const friendIds = friendsSnapshot.docs.map(doc => doc.id);
             const onlineFriendPromises = [];
 
+            // Para cada amigo, verifica seu status no Realtime Database
             for (const friendId of friendIds) {
                 const statusRef = rtdb.ref('/status/' + friendId);
                 const promise = statusRef.get().then(snapshot => {
                     if (snapshot.exists() && snapshot.val().state === 'online') {
-                        return friendId;
+                        return friendId; // Retorna o ID se estiver online
                     }
                     return null;
                 });
                 onlineFriendPromises.push(promise);
             }
             
+            // Filtra apenas os IDs dos amigos que estão online
             const onlineFriendIds = (await Promise.all(onlineFriendPromises)).filter(id => id !== null);
 
             if (onlineFriendIds.length === 0) {
@@ -150,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
+            // Busca os dados completos dos amigos online para exibir na lista
             const onlineFriendsHtmlPromises = onlineFriendIds.map(async (friendId) => {
                 const userDoc = await db.collection('usuarios').doc(friendId).get();
                 if (userDoc.exists) {
@@ -176,20 +213,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Busca e exibe a lista completa de amigos do usuário.
+     */
     async function fetchFriends() {
         if (!currentUser) return;
         ui.friendsList.innerHTML = '<li class="friend-item-empty">Carregando sua lista de amigos...</li>';
         
         try {
-            const friendsSnapshot = await db.collection('usuarios').doc(currentUser.uid).collection('amigos')
-                .where('status', '==', 'accepted')
-                .get();
+            const friendsSnapshot = await db.collection('usuarios').doc(currentUser.uid).collection('amigos').where('status', '==', 'accepted').get();
             
             if (friendsSnapshot.empty) {
                 ui.friendsList.innerHTML = '<li class="friend-item-empty">Você ainda não tem amigos. Use a busca para adicionar.</li>';
                 return;
             }
 
+            // Mapeia os amigos e gera o HTML para cada um
             const friendsHtmlArray = [];
             for (const doc of friendsSnapshot.docs) {
                 const friendData = doc.data();
@@ -220,21 +259,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Remove um amigo da lista de amizades (operação em batch para garantir consistência).
+     * @param {string} friendId - O UID do amigo a ser removido.
+     * @param {string} friendName - O nome do amigo.
+     */
     function removeFriend(friendId, friendName) {
         openConfirmModal('Remover Amigo', `Você tem certeza que quer remover ${friendName} da sua lista de amigos?`, async () => {
             if (!currentUser) return;
 
-            const batch = db.batch();
+            const batch = db.batch(); // Inicia um batch de escrita
 
+            // Deleta o registro de amizade do usuário atual
             const currentUserFriendRef = db.collection('usuarios').doc(currentUser.uid).collection('amigos').doc(friendId);
             batch.delete(currentUserFriendRef);
             
+            // Deleta o registro de amizade do outro usuário
             const friendUserRef = db.collection('usuarios').doc(friendId).collection('amigos').doc(currentUser.uid);
             batch.delete(friendUserRef);
             
+            // Pega o nome do usuário atual para a notificação
             const currentUserDoc = await db.collection('usuarios').doc(currentUser.uid).get();
             const currentUserName = currentUserDoc.data().nome;
 
+            // Cria uma notificação para o amigo que foi removido
             const notificationRef = db.collection('notificacoes').doc();
             batch.set(notificationRef, {
                 userId: friendId,
@@ -244,10 +292,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             try {
-                await batch.commit();
+                await batch.commit(); // Executa todas as operações do batch atomicamente
                 showToast(`${friendName} foi removido da sua lista de amigos.`, 'info');
                 const friendElement = document.getElementById(`friend-${friendId}`);
-                if (friendElement) friendElement.remove();
+                if (friendElement) friendElement.remove(); // Remove o elemento da UI
 
                 if (ui.friendsList.children.length === 0) {
                      ui.friendsList.innerHTML = '<li class="friend-item-empty">Você ainda não tem amigos. Use a busca para adicionar.</li>';
@@ -259,6 +307,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /**
+     * Busca e exibe as solicitações de amizade pendentes.
+     */
     async function fetchFriendRequests() {
         if (!currentUser) return;
         ui.friendsList.innerHTML = '<li class="friend-item-empty">Buscando solicitações...</li>';
@@ -305,6 +356,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Aceita uma solicitação de amizade.
+     * @param {string} friendId - O UID do usuário que enviou a solicitação.
+     * @param {string} friendName - O nome do usuário.
+     */
     async function acceptFriendRequest(friendId, friendName) {
         if (!currentUser) return;
 
@@ -314,12 +370,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const batch = db.batch();
 
+        // Atualiza o status para 'accepted' para o usuário atual
         const currentUserFriendRef = db.collection('usuarios').doc(currentUserId).collection('amigos').doc(friendId);
         batch.update(currentUserFriendRef, { status: 'accepted' });
 
+        // Atualiza o status para 'accepted' para o outro usuário
         const friendUserRef = db.collection('usuarios').doc(friendId).collection('amigos').doc(currentUserId);
         batch.update(friendUserRef, { status: 'accepted' });
         
+        // Envia uma notificação para o outro usuário informando que a solicitação foi aceita
         const notificationRef = db.collection('notificacoes').doc();
         batch.set(notificationRef, {
             userId: friendId,
@@ -344,12 +403,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Recusa uma solicitação de amizade.
+     * @param {string} friendId - O UID do usuário que enviou a solicitação.
+     */
     async function declineFriendRequest(friendId) {
         if (!currentUser) return;
         const currentUserId = currentUser.uid;
 
         const batch = db.batch();
 
+        // Deleta o registro da solicitação para ambos os usuários
         const currentUserFriendRef = db.collection('usuarios').doc(currentUserId).collection('amigos').doc(friendId);
         batch.delete(currentUserFriendRef);
         
@@ -371,6 +435,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Lida com a busca de usuários para adicionar como amigos.
+     * @param {KeyboardEvent} event - O evento de teclado.
+     */
     async function handleFriendSearch(event) {
         if (event.key !== 'Enter') return;
         event.preventDefault();
@@ -380,7 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const searchTerm = ui.friendsSearchBar.value.trim().toLowerCase();
         
         if (searchTerm.length === 0) {
-            fetchFriends();
+            fetchFriends(); // Se a busca estiver vazia, mostra a lista de amigos novamente
             return;
         }
 
@@ -392,6 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
+            // Busca por usuários cujo nome (em minúsculas) comece com o termo de busca
             const searchQuery = db.collection('usuarios')
                 .where('nome_lowercase', '>=', searchTerm)
                 .where('nome_lowercase', '<=', searchTerm + '\uf8ff')
@@ -405,7 +474,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             const usersHtml = snapshot.docs.map(doc => {
-                if (doc.id === currentUser.uid) return ''; 
+                if (doc.id === currentUser.uid) return ''; // Não exibe o próprio usuário na busca
 
                 const userData = doc.data();
                 const userId = doc.id;
@@ -430,6 +499,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    /**
+     * Envia uma solicitação de amizade para outro usuário.
+     * @param {string} receiverId - O UID do usuário que receberá a solicitação.
+     * @param {string} receiverName - O nome do usuário.
+     */
     async function sendFriendRequest(receiverId, receiverName) {
         if (!currentUser || !receiverId) return;
 
@@ -444,12 +518,15 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const batch = db.batch();
 
+            // Cria o registro para o remetente com status 'pending_sent'
             const senderRef = db.collection('usuarios').doc(senderId).collection('amigos').doc(receiverId);
             batch.set(senderRef, { status: 'pending_sent', amigoNome: receiverName, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
 
+            // Cria o registro para o destinatário com status 'pending_received'
             const receiverRef = db.collection('usuarios').doc(receiverId).collection('amigos').doc(senderId);
             batch.set(receiverRef, { status: 'pending_received', amigoNome: senderName, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
 
+            // Envia uma notificação para o destinatário
             const notificationRef = db.collection('notificacoes').doc();
             batch.set(notificationRef, {
                 userId: receiverId,
@@ -472,9 +549,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // =================================================================================
-    // LÓGICA DE CONVITE PARA PARTIDAS
+    // 4. LÓGICA DE CONVITE PARA PARTIDAS
     // =================================================================================
 
+    /**
+     * Exibe um modal com a lista de amigos para convidá-los para uma partida específica.
+     * @param {string} matchId - O ID da partida para a qual convidar.
+     */
     async function showInviteFriendsModal(matchId) {
         if (!matchId) return;
         currentOpenMatchId = matchId;
@@ -482,11 +563,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.inviteFriendsList.innerHTML = '<li class="friend-item-empty">Carregando amigos...</li>';
 
         try {
-            const friendsPromise = db.collection('usuarios').doc(currentUser.uid).collection('amigos')
-                .where('status', '==', 'accepted').get();
-            
+            // Busca a lista de amigos e a lista de jogadores da partida em paralelo
+            const friendsPromise = db.collection('usuarios').doc(currentUser.uid).collection('amigos').where('status', '==', 'accepted').get();
             const playersPromise = db.collection('partidas').doc(matchId).collection('jogadores').get();
-
             const [friendsSnapshot, playersSnapshot] = await Promise.all([friendsPromise, playersPromise]);
 
             if (friendsSnapshot.empty) {
@@ -494,6 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // Cria um conjunto com os IDs dos jogadores que já estão na partida
             const playerIds = new Set(playersSnapshot.docs.map(doc => doc.id));
             
             const friendsHtmlArray = [];
@@ -504,6 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const userData = userDoc.data();
 
                 let buttonHTML;
+                // Se o amigo já está na partida, o botão de convite fica desabilitado
                 if (playerIds.has(friendId)) {
                     buttonHTML = `<button class="btn btn-secondary" disabled>Na Partida</button>`;
                 } else {
@@ -531,6 +612,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Envia uma notificação de convite de partida para um amigo.
+     * @param {string} friendId - O UID do amigo a ser convidado.
+     * @param {string} friendName - O nome do amigo.
+     */
     async function sendMatchInvite(friendId, friendName) {
         if (!currentUser || !friendId || !currentOpenMatchId) return;
 
@@ -539,18 +625,20 @@ document.addEventListener('DOMContentLoaded', () => {
         inviteButton.textContent = 'Enviando...';
 
         try {
+            // Busca os nomes do remetente e da partida para incluir na notificação
             const senderDoc = await db.collection('usuarios').doc(currentUser.uid).get();
             const senderName = senderDoc.data().nome;
 
             const matchDoc = await db.collection('partidas').doc(currentOpenMatchId).get();
             const matchName = matchDoc.data().nome;
 
+            // Cria a notificação
             await db.collection('notificacoes').add({
                 userId: friendId,
                 message: `${senderName} te convidou para a partida "${matchName}"!`,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 isRead: false,
-                type: 'match_invite',
+                type: 'match_invite', // Tipo especial para adicionar o botão "Inscrever-se"
                 matchId: currentOpenMatchId
             });
 
@@ -566,9 +654,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // =================================================================================
-    // LÓGICA DE NOTIFICAÇÕES
+    // 5. LÓGICA DE NOTIFICAÇÕES
     // =================================================================================
     
+    /**
+     * Busca e exibe as notificações mais recentes do usuário.
+     */
     async function fetchAndDisplayNotifications() {
         if (!currentUser || !ui.notificationsList) return;
         try {
@@ -589,11 +680,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const notificationsHtml = snapshot.docs.map(doc => {
                 const notification = doc.data();
                 if (!notification.isRead) {
-                    hasUnread = true;
+                    hasUnread = true; // Se encontrar qualquer notificação não lida, ativa o ponto vermelho
                 }
 
                 const date = notification.timestamp ? notification.timestamp.toDate().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
                 
+                // Adiciona o botão "Inscrever-se" se a notificação for um convite de partida
                 let actionButtonHTML = '';
                 if (notification.type === 'match_invite' && notification.matchId) {
                     actionButtonHTML = `<button class="btn-notification-action" onclick="goToMatchRegistration('${notification.matchId}', event)">Inscrever-se</button>`;
@@ -615,7 +707,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }).join('');
             
             ui.notificationsList.innerHTML = notificationsHtml;
-            ui.notificationDot.classList.toggle('visible', hasUnread);
+            ui.notificationDot.classList.toggle('visible', hasUnread); // Mostra ou esconde o ponto vermelho
 
         } catch (error) {
             console.error("Erro ao buscar notificações:", error);
@@ -623,6 +715,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Redireciona para a página de inscrição de partida a partir de uma notificação.
+     * @param {string} matchId - O ID da partida.
+     * @param {Event} event - O evento de clique, para evitar que o modal feche.
+     */
     function goToMatchRegistration(matchId, event) {
         event.stopPropagation(); 
         if (!matchId) return showToast('ID da partida não encontrado.', 'error');
@@ -632,6 +729,9 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = `cadastrojogador.html?matchId=${matchId}`;
     }
 
+    /**
+     * Marca todas as notificações visíveis e não lidas como lidas no Firestore.
+     */
     async function markNotificationsAsRead() {
         ui.notificationDot.classList.remove('visible');
         
@@ -643,7 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const notifId = item.id.replace('notif-', '');
             const notifRef = db.collection('notificacoes').doc(notifId);
             batch.update(notifRef, { isRead: true });
-            item.classList.remove('unread');
+            item.classList.remove('unread'); // Remove o estilo de não lido da UI imediatamente
         });
 
         try {
@@ -653,6 +753,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Deleta uma notificação específica.
+     * @param {string} notificationId - O ID da notificação a ser deletada.
+     */
     async function deleteNotification(notificationId) {
         try {
             await db.collection('notificacoes').doc(notificationId).delete();
@@ -671,9 +775,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // =================================================================================
-    // LÓGICA DE PARTIDAS
+    // 6. LÓGICA DE EXIBIÇÃO E GERENCIAMENTO DE PARTIDAS
     // =================================================================================
 
+    /**
+     * Copia o link de inscrição de uma partida para a área de transferência.
+     * @param {string} matchId - O ID da partida.
+     * @param {string} matchName - O nome da partida.
+     */
     function shareMatch(matchId, matchName) {
         const url = `${window.location.origin}${window.location.pathname.replace('inicio.html', '')}cadastrojogador.html?matchId=${matchId}`;
         navigator.clipboard.writeText(url).then(() => {
@@ -684,6 +793,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /**
+     * Abre um modal com os detalhes completos de uma partida, incluindo a lista de jogadores.
+     * @param {string} matchId - O ID da partida.
+     */
     async function openMatchDetails(matchId) {
         if (!matchId) return;
         currentOpenMatchId = matchId;
@@ -710,6 +823,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 playersHTML = playersSnapshot.docs.map(playerDoc => {
                     const playerData = playerDoc.data();
                     const playerId = playerDoc.id;
+                    // O botão de remover só aparece para o criador da partida e não para o próprio criador
                     const removeButton = isCreator && playerId !== currentUser.uid ?
                         `<button class="btn-remove-player" onclick="removerJogador('${matchId}', '${playerId}', '${matchData.nome}')">×</button>` :
                         '';
@@ -726,8 +840,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }).join('');
             }
 
-            // A LINHA ABAIXO FOI A ÚNICA ALTERADA
-            const maxPlayers = matchData.vagasTotais || 'N/A'; // Garante que não dê erro se o campo não existir
+            const maxPlayers = matchData.vagasTotais || 'N/A';
 
             ui.matchDetailsContent.innerHTML = `
             <div class="modal-match-info">
@@ -755,11 +868,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     
+    /**
+     * Remove um jogador de uma partida (função para o criador da partida).
+     * @param {string} matchId - O ID da partida.
+     * @param {string} playerId - O UID do jogador a ser removido.
+     * @param {string} matchName - O nome da partida (para a notificação).
+     */
     async function removerJogador(matchId, playerId, matchName) {
         openConfirmModal('Remover Jogador', 'Você tem certeza?', async () => {
             toggleLoading(true);
             try {
+                // Deleta o documento do jogador da subcoleção
                 await db.collection('partidas').doc(matchId).collection('jogadores').doc(playerId).delete();
+                // Envia uma notificação para o jogador que foi removido
                 await db.collection('notificacoes').add({
                     userId: playerId,
                     message: `Você foi removido da partida "${matchName}" pelo organizador.`,
@@ -767,7 +888,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     isRead: false
                 });
                 showToast('Jogador removido com sucesso!', 'success');
-                openMatchDetails(matchId);
+                openMatchDetails(matchId); // Reabre o modal para atualizar a lista
             } catch (error) {
                 console.error("Erro ao remover jogador:", error);
                 showToast('Não foi possível remover o jogador.', 'error');
@@ -777,6 +898,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    /**
+     * Busca e exibe as partidas nas quais o usuário está inscrito.
+     */
     async function fetchAndDisplayRegisteredMatches() {
         if (!currentUser || !ui.registeredMatchesGrid) return;
         ui.registeredMatchesGrid.innerHTML = '<p>Buscando jogos em que você se cadastrou...</p>';
@@ -806,9 +930,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Busca e exibe todas as partidas disponíveis, aplicando os filtros selecionados.
+     */
     async function fetchAndDisplayMatches() {
         if (!ui.allMatchesGrid) return;
         ui.allMatchesGrid.innerHTML = '<p>Carregando partidas...</p>';
+        // Limpa o carrossel apenas se não houver filtros ativos
         if (!ui.filterDate.value && !ui.filterLocal.value && !ui.filterType.value) {
              ui.carouselSlides.innerHTML = '';
         }
@@ -817,6 +945,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const filterLocal = ui.filterLocal.value.toLowerCase().trim();
         const filterType = ui.filterType.value;
 
+        // Pega a data de hoje para garantir que apenas partidas futuras sejam mostradas
         const today = new Date();
         const year = today.getFullYear();
         const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -826,6 +955,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const startDate = filterDate && filterDate > todayString ? filterDate : todayString;
 
         try {
+            // Constrói a query do Firestore
             let query = db.collection('partidas').where('data', '>=', startDate);
 
             if (filterType) {
@@ -841,6 +971,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 allMatches.push({ id: doc.id, ...doc.data() });
             });
 
+            // O filtro de local é feito no lado do cliente pois o Firestore tem limitações com query de texto parcial ('contains')
             let filteredMatches = allMatches;
             if (filterLocal) {
                 filteredMatches = allMatches.filter(match => 
@@ -848,6 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 );
             }
 
+            // Exibe as partidas filtradas
             if (filteredMatches.length === 0) {
                 ui.allMatchesGrid.innerHTML = '<p>Nenhuma partida encontrada com os filtros selecionados.</p>';
             } else {
@@ -855,8 +987,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 ui.allMatchesGrid.innerHTML = matchesHTML;
             }
             
+            // Popula o carrossel apenas se não houver filtros ativos
             if (!ui.filterDate.value && !ui.filterLocal.value && !ui.filterType.value) {
-                const carouselMatches = filteredMatches.slice(0, 5);
+                const carouselMatches = filteredMatches.slice(0, 5); // Pega as 5 primeiras partidas
                 const carouselHTML = carouselMatches.map(match => createCarouselSlide(match, match.id)).join('');
                 ui.carouselSlides.innerHTML = carouselHTML;
                 setupCarousel();
@@ -868,6 +1001,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Busca e exibe as partidas criadas pelo próprio usuário.
+     */
     async function fetchAndDisplayMyMatches() {
         if (!currentUser || !ui.myMatchesGrid) return;
         ui.myMatchesGrid.innerHTML = '<p>Carregando suas partidas...</p>';
@@ -894,12 +1030,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Gera o HTML para um card de partida padrão.
+     * @param {object} match - Os dados da partida.
+     * @param {string} matchId - O ID da partida.
+     * @returns {string} O HTML do card.
+     */
     function createMatchCard(match, matchId) {
         const formattedDate = formatDateToPtBr(match.data);
         const imageUrl = match.imagemURL || 'imagens/campo.jfif';
         const creatorNameStyle = "font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 5px;";
         
         let actionButtonHTML;
+        // Verifica se o usuário está inscrito para exibir o botão correto
         if (registeredMatchIds.has(matchId)) {
             actionButtonHTML = `<button class="btn btn-success" style="flex-grow: 1;" disabled>Inscrito</button>`;
         } else {
@@ -924,29 +1067,41 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    /**
+     * Gera o HTML para um slide do carrossel.
+     * @param {object} match - Os dados da partida.
+     * @param {string} matchId - O ID da partida.
+     * @returns {string} O HTML do slide.
+     */
     function createCarouselSlide(match, matchId) {
-    const imageUrl = match.imagemURL || 'imagens/campo.jfif';
-    const tipoPartida = match.tipo.charAt(0).toUpperCase() + match.tipo.slice(1);
+        const imageUrl = match.imagemURL || 'imagens/campo.jfif';
+        const tipoPartida = match.tipo.charAt(0).toUpperCase() + match.tipo.slice(1);
 
-    let actionButtonHTML;
-    if (registeredMatchIds.has(matchId)) {
-        actionButtonHTML = `<button class="btn btn-success" disabled>Inscrito</button>`;
-    } else {
-        actionButtonHTML = `<button class="btn-cadastrar-match" onclick="cadastrarEmPartida('${matchId}')">Cadastrar</button>`;
+        let actionButtonHTML;
+        if (registeredMatchIds.has(matchId)) {
+            actionButtonHTML = `<button class="btn btn-success" disabled>Inscrito</button>`;
+        } else {
+            actionButtonHTML = `<button class="btn-cadastrar-match" onclick="cadastrarEmPartida('${matchId}')">Cadastrar</button>`;
+        }
+
+        return `
+            <div class="slide" data-match-id="${matchId}">
+                <img src="${imageUrl}" class="carrossel-img" alt="${match.nome}" onclick="openMatchDetails('${matchId}')">
+                <div class="slide-content">
+                    <h3 onclick="openMatchDetails('${matchId}')">${match.nome}</h3>
+                    <p>${tipoPartida} - ${match.local}</p>
+                    ${actionButtonHTML}
+                </div>
+            </div>
+        `;
     }
 
-    return `
-        <div class="slide" data-match-id="${matchId}">
-            <img src="${imageUrl}" class="carrossel-img" alt="${match.nome}" onclick="openMatchDetails('${matchId}')">
-            <div class="slide-content">
-                <h3 onclick="openMatchDetails('${matchId}')">${match.nome}</h3>
-                <p>${tipoPartida} - ${match.local}</p>
-                ${actionButtonHTML}
-            </div>
-        </div>
-    `;
-}
-
+    /**
+     * Gera o HTML para um card na seção "Minhas Partidas Criadas".
+     * @param {object} match - Os dados da partida.
+     * @param {string} matchId - O ID da partida.
+     * @returns {string} O HTML do card.
+     */
     function createMyMatchCard(match, matchId) {
         const formattedDate = formatDateToPtBr(match.data);
         const imageUrl = match.imagemURL || 'imagens/campo.jfif';
@@ -973,6 +1128,12 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    /**
+     * Gera o HTML para um card na seção "Meus Jogos Cadastrados".
+     * @param {object} match - Os dados da partida.
+     * @param {string} matchId - O ID da partida.
+     * @returns {string} O HTML do card.
+     */
     function createRegisteredMatchCard(match, matchId) {
         const formattedDate = formatDateToPtBr(match.data);
         const imageUrl = match.imagemURL || 'imagens/campo.jfif';
@@ -998,14 +1159,17 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    /**
+     * Redireciona o usuário para a página de inscrição da partida.
+     * @param {string} matchId - O ID da partida.
+     */
     async function cadastrarEmPartida(matchId) {
         if (!matchId || !currentUser) {
             return showToast('ID da partida ou usuário não encontrado.', 'error');
         }
-
         toggleLoading(true);
-
         try {
+            // Verifica se o usuário já está cadastrado para evitar redirecionamento desnecessário
             const playerDocRef = db.collection('partidas').doc(matchId).collection('jogadores').doc(currentUser.uid);
             const playerDoc = await playerDocRef.get();
 
@@ -1022,22 +1186,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Redireciona para a página de edição de inscrição.
+     * @param {string} matchId - O ID da partida.
+     */
     function alterarInscricao(matchId) {
         if (!matchId) return showToast('ID da partida não encontrado.', 'error');
         window.location.href = `cadastrojogador.html?matchId=${matchId}&edit=true`;
     }
 
+    /**
+     * Redireciona para a página de edição de partida.
+     * @param {string} matchId - O ID da partida.
+     */
     function editMatch(matchId) {
         window.location.href = `criar.html?id=${matchId}`;
     }
 
+    /**
+     * Deleta uma partida criada pelo usuário.
+     * @param {string} matchId - O ID da partida.
+     */
     function deleteMatch(matchId) {
         openConfirmModal('Excluir Partida', 'Você tem certeza?', async () => {
             toggleLoading(true);
             try {
                 await db.collection('partidas').doc(matchId).delete();
                 showToast('Partida excluída!', 'success');
-                fetchAndDisplayMatches();
+                fetchAndDisplayMatches(); // Atualiza as listas
                 fetchAndDisplayMyMatches();
             } catch (error) {
                 console.error('Erro ao excluir partida:', error);
@@ -1048,6 +1224,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /**
+     * Cancela a inscrição do usuário em uma partida.
+     * @param {string} matchId - O ID da partida.
+     */
     async function cancelarInscricao(matchId) {
         if (!currentUser) return;
         openConfirmModal('Cancelar Inscrição', 'Tem certeza?', async () => {
@@ -1055,8 +1235,8 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 await db.collection('partidas').doc(matchId).collection('jogadores').doc(currentUser.uid).delete();
                 
-                registeredMatchIds.delete(matchId);
-                fetchAndDisplayRegisteredMatches();
+                registeredMatchIds.delete(matchId); // Remove o ID do conjunto de inscrições
+                fetchAndDisplayRegisteredMatches(); // Atualiza as listas
                 fetchAndDisplayMatches();
                 
                 showToast('Inscrição cancelada.', 'success');
@@ -1070,26 +1250,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // =================================================================================
-    // FUNÇÕES GERAIS (MODAIS, UI, FILTROS, ETC.)
+    // 7. FUNÇÕES GERAIS DA INTERFACE (MODAIS, UI, FILTROS, PERFIL, ETC.)
     // =================================================================================
     
+    /**
+     * Salva os filtros de local e tipo no localStorage para persistência.
+     */
     function saveFiltersToLocalStorage() {
         localStorage.setItem('matchScore_filterLocal', ui.filterLocal.value);
         localStorage.setItem('matchScore_filterType', ui.filterType.value);
     }
 
+    /**
+     * Carrega os filtros do localStorage quando a página é carregada.
+     */
     function loadFiltersFromLocalStorage() {
         const savedLocal = localStorage.getItem('matchScore_filterLocal');
         const savedType = localStorage.getItem('matchScore_filterType');
 
-        if (savedLocal) {
-            ui.filterLocal.value = savedLocal;
-        }
-        if (savedType) {
-            ui.filterType.value = savedType;
-        }
+        if (savedLocal) ui.filterLocal.value = savedLocal;
+        if (savedType) ui.filterType.value = savedType;
     }
 
+    /**
+     * Fecha todos os modais abertos.
+     */
     function closeAllModals() {
         document.querySelectorAll('.modal.active').forEach(modal => {
             if (modal.id !== 'confirmModal') {
@@ -1097,34 +1282,44 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         if (document.querySelectorAll('.modal.active').length === 0) {
-            document.body.style.overflow = 'auto';
+            document.body.style.overflow = 'auto'; // Restaura o scroll do body
         }
     }
 
+    /**
+     * Abre um modal específico.
+     * @param {string} modalId - O ID do elemento modal.
+     */
     function openModal(modalId) {
-        if (modalId !== 'confirmModal') {
-            closeAllModals(); 
-        }
+        if (modalId !== 'confirmModal') closeAllModals(); 
         const modal = document.getElementById(modalId);
         if (modal) {
             modal.classList.add('active');
-            document.body.style.overflow = 'hidden';
+            document.body.style.overflow = 'hidden'; // Impede o scroll do body
             if (modalId === 'notificationsModal') {
-                markNotificationsAsRead();
+                markNotificationsAsRead(); // Marca as notificações como lidas ao abrir o modal
             }
         }
     }
 
+    /**
+     * Fecha um modal específico.
+     * @param {string} modalId - O ID do elemento modal.
+     */
     function closeModal(modalId) {
         const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.classList.remove('active');
-        }
+        if (modal) modal.classList.remove('active');
         if (document.querySelectorAll('.modal.active').length === 0) {
             document.body.style.overflow = 'auto';
         }
     }
 
+    /**
+     * Abre um modal de confirmação genérico.
+     * @param {string} title - O título do modal.
+     * @param {string} message - A mensagem de confirmação.
+     * @param {function} onConfirmCallback - A função a ser executada se o usuário confirmar.
+     */
     function openConfirmModal(title, message, onConfirmCallback) {
         openModal('confirmModal');
         const confirmTitle = document.getElementById('confirmTitle');
@@ -1133,6 +1328,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirmTitle || !confirmMessage || !confirmBtn) return;
         confirmTitle.textContent = title;
         confirmMessage.textContent = message;
+        // Clona e substitui o botão para remover listeners antigos e evitar múltiplos cliques
         const newConfirmBtn = confirmBtn.cloneNode(true);
         confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
         newConfirmBtn.addEventListener('click', () => {
@@ -1141,16 +1337,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { once: true });
     }
 
+    /**
+     * Alterna a visibilidade do menu lateral (sidebar).
+     * @param {boolean} [forceOpen] - Força a abertura ou fechamento.
+     */
     function toggleSidebar(forceOpen) {
         const isOpen = ui.sidebar.classList.contains('open');
         const shouldOpen = forceOpen !== undefined ? forceOpen : !isOpen;
-
         ui.sidebar.classList.toggle('open', shouldOpen);
         if (ui.sidebarOverlay) {
             ui.sidebarOverlay.classList.toggle('active', shouldOpen);
         }
     }
 
+    /**
+     * Exibe uma seção principal da página e oculta as outras.
+     * @param {string} sectionId - O ID da seção a ser exibida (ex: 'home', 'friends').
+     */
     function showSection(sectionId) {
         closeAllModals(); 
         document.querySelectorAll('.page-section').forEach(section => {
@@ -1159,15 +1362,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const content = document.getElementById(`${sectionId}-content`);
         if (content) content.style.display = 'block';
         
+        // Se a seção for de amigos, ativa a primeira aba por padrão
         if(sectionId === 'friends') {
             changeFriendsTab('all', ui.friendsTabs[0]);
         }
 
+        // Fecha o sidebar em telas pequenas após selecionar um item
         if (window.innerWidth <= 768 && ui.sidebar.classList.contains('open')) {
             toggleSidebar(false);
         }
     }
 
+    /**
+     * Carrega os dados do perfil do usuário do Firestore e os exibe no modal de perfil.
+     */
     async function loadUserProfile() {
         if (!currentUser) return;
         try {
@@ -1177,7 +1385,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ui.profilePicPreview.src = data.fotoURL || 'imagens/perfil.png';
                 ui.profileInfoDiv.innerHTML = `<p><strong>Nome:</strong> ${data.nome || ''}</p><p><strong>Email:</strong> ${data.email || ''}</p><p><strong>Telefone:</strong> ${data.telefone || ''}</p><p><strong>Data Nasc:</strong> ${formatDateToPtBr(data.dataNascimento) || ''}</p><p><strong>Posição:</strong> ${data.posicao || ''}</p>`;
                 const isDark = (data.theme !== 'light');
-                applyTheme(isDark);
+                applyTheme(isDark); // Aplica o tema salvo do usuário
             } else {
                 showToast("Perfil não encontrado.", "error");
             }
@@ -1187,6 +1395,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Alterna a UI para o modo de edição de perfil.
+     */
     function enterEditMode() {
         if (!currentUser) return;
         db.collection('usuarios').doc(currentUser.uid).get().then(doc => {
@@ -1206,6 +1417,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }).catch(error => console.error("Erro ao buscar perfil para edição: ", error));
     }
 
+    /**
+     * Sai do modo de edição de perfil.
+     * @param {boolean} [forceReload=false] - Se true, recarrega os dados do perfil do Firestore.
+     */
     function exitEditMode(forceReload = false) {
         ui.profileInfoDiv.style.display = 'block';
         ui.profileEditForm.style.display = 'none';
@@ -1213,14 +1428,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (forceReload) loadUserProfile();
     }
 
+    /**
+     * Salva as alterações feitas no perfil do usuário.
+     */
     async function saveProfileChanges() {
         if (!currentUser) return;
 
         const newName = document.getElementById('editNome').value.trim();
-
         const dataToUpdate = {
             nome: newName,
-            nome_lowercase: newName.toLowerCase(),
+            nome_lowercase: newName.toLowerCase(), // Atualiza o campo de busca
             email: document.getElementById('editEmail').value.trim(),
             telefone: document.getElementById('editTelefone').value.trim(),
             dataNascimento: document.getElementById('editDataNascimento').value,
@@ -1230,7 +1447,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleLoading(true);
             await db.collection('usuarios').doc(currentUser.uid).set(dataToUpdate, { merge: true });
             showToast('Perfil atualizado com sucesso!', 'success');
-            exitEditMode(true);
+            exitEditMode(true); // Sai do modo de edição e recarrega os dados
         } catch (error) {
             console.error('Erro ao salvar perfil:', error);
             showToast('Erro ao salvar perfil.', 'error');
@@ -1239,6 +1456,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Lida com a seleção de uma nova foto de perfil.
+     * @param {Event} event - O evento de mudança do input de arquivo.
+     */
     async function handleProfileImageChange(event) {
         const file = event.target.files[0];
         if (!file || !currentUser) return;
@@ -1252,31 +1473,31 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error("Erro ao salvar a foto:", error);
                 showToast('Erro ao salvar a foto.', 'error');
-                loadUserProfile();
+                loadUserProfile(); // Recarrega o perfil para reverter a imagem em caso de erro
             } finally {
                 toggleLoading(false);
             }
         });
-        event.target.value = '';
+        event.target.value = ''; // Limpa o input para permitir selecionar o mesmo arquivo novamente
     }
 
+    /**
+     * Aplica o tema (claro/escuro) à página.
+     * @param {boolean} isDark - True para tema escuro, false para tema claro.
+     */
     function applyTheme(isDark) {
         document.body.classList.toggle('light-mode', !isDark);
         ui.themeToggle.checked = isDark;
     }
 
-    ui.themeToggle.addEventListener('change', () => {
-        const isDark = ui.themeToggle.checked;
-        applyTheme(isDark);
-        if (currentUser) {
-            db.collection('usuarios').doc(currentUser.uid).set({ theme: isDark ? 'dark' : 'light' }, { merge: true });
-        }
-    });
-
+    /**
+     * Realiza o logout do usuário.
+     */
     async function logout() {
         openConfirmModal('Sair da Conta', 'Você tem certeza que deseja sair?', async () => {
             try {
                 await auth.signOut();
+                localStorage.removeItem('isLoggedIn'); // Limpa o estado de login
                 window.location.href = 'index.html';
             } catch (error) {
                 console.error("Erro ao fazer logout:", error);
@@ -1285,6 +1506,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    /**
+     * Configura a lógica do carrossel (navegação, responsividade).
+     */
     function setupCarousel() {
         const slidesContainer = ui.carouselSlides;
         if (!slidesContainer || slidesContainer.children.length === 0) return;
@@ -1310,16 +1534,27 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         btnAnterior.onclick = () => { slideAtual--; atualizarCarousel(); };
         btnProximo.onclick = () => { slideAtual++; atualizarCarousel(); };
-        window.onresize = atualizarCarousel;
+        window.onresize = atualizarCarousel; // Atualiza o carrossel ao redimensionar a janela
         atualizarCarousel();
     }
 
+    /**
+     * Formata uma data do formato 'AAAA-MM-DD' para 'DD/MM/AAAA'.
+     * @param {string} dateInput - A data a ser formatada.
+     * @returns {string} A data formatada.
+     */
     function formatDateToPtBr(dateInput) {
         if (!dateInput) return '';
         const [year, month, day] = dateInput.split('-');
         return `${day}/${month}/${year}`;
     }
 
+    // =================================================================================
+    // 8. CONFIGURAÇÃO DOS EVENT LISTENERS
+    // =================================================================================
+
+    // Atribui funções ao objeto 'window' para que possam ser chamadas a partir do HTML (ex: onclick="logout()").
+    // Isso é uma forma de expor as funções do módulo para o escopo global de forma controlada.
     Object.assign(window, {
         toggleSidebar,
         openModal,
@@ -1351,38 +1586,44 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ui.friendsSearchBar) {
         ui.friendsSearchBar.addEventListener('keydown', handleFriendSearch);
     }
-
     if (ui.sidebarOverlay) {
         ui.sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
     }
 
+    // Carrega filtros salvos e adiciona listeners para salvar novas alterações
     loadFiltersFromLocalStorage();
-    
     ui.filterDate.addEventListener('change', fetchAndDisplayMatches);
-    
     ui.filterLocal.addEventListener('input', () => {
         fetchAndDisplayMatches();
         saveFiltersToLocalStorage();
     });
-
     ui.filterType.addEventListener('change', () => {
         fetchAndDisplayMatches();
         saveFiltersToLocalStorage();
     });
-
     ui.clearFiltersBtn.addEventListener('click', () => {
         ui.filterDate.value = '';
         ui.filterLocal.value = '';
         ui.filterType.value = '';
-        
         localStorage.removeItem('matchScore_filterLocal');
         localStorage.removeItem('matchScore_filterType');
-
         fetchAndDisplayMatches();
     });
 
+    // Listener para o botão de alterar tema
+    ui.themeToggle.addEventListener('change', () => {
+        const isDark = ui.themeToggle.checked;
+        applyTheme(isDark);
+        if (currentUser) {
+            // Salva a preferência de tema do usuário no Firestore
+            db.collection('usuarios').doc(currentUser.uid).set({ theme: isDark ? 'dark' : 'light' }, { merge: true });
+        }
+    });
+
+    // Listener para o input de mudança de foto de perfil
     ui.profileImageInputEdit.addEventListener('change', handleProfileImageChange);
 
+    // Listener para fechar modais clicando na área de overlay (fora do modal-box)
     document.querySelectorAll('.modal').forEach(modal => {
         modal.addEventListener('click', (event) => {
             if (event.target === modal) {
@@ -1391,5 +1632,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Ponto de entrada inicial da UI: exibe a seção 'home' por padrão.
     showSection('home');
 });

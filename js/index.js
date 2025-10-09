@@ -1,43 +1,49 @@
 'use strict';
 
 /**
- * Exibe a tela de carregamento e depois redireciona para a página desejada.
- * @param {string} page - A URL da página para redirecionar.
+ * @fileoverview Script para a página inicial (index.html).
+ * Lida com a navegação inicial do usuário, redirecionando para as páginas
+ * de cadastro, login ou sobre, e exibe uma tela de carregamento durante a transição.
+ */
+
+/**
+ * Exibe a tela de carregamento e, após um breve intervalo, redireciona o usuário
+ * para a página especificada.
+ * @param {string} page - A URL da página de destino.
  */
 function showLoadingAndRedirect(page) {
   const loadingScreen = document.getElementById('loading');
   if (!loadingScreen) return;
 
+  // Torna a tela de carregamento visível
   loadingScreen.hidden = false;
-  // Usar 'flex' para garantir que o conteúdo seja centralizado, conforme o CSS
   loadingScreen.style.display = 'flex'; 
-  document.body.style.cursor = 'wait';
+  document.body.style.cursor = 'wait'; // Muda o cursor do mouse
 
-  // Um pequeno atraso para garantir que a animação de loading seja visível
+  // Adiciona um pequeno atraso para que a animação de loading seja percebida
   setTimeout(() => {
     window.location.href = page;
   }, 1500); // 1.5 segundos
 }
 
-// Ponto de entrada principal do script, executado após o DOM estar pronto.
+// Executa o script após o carregamento completo do DOM.
 document.addEventListener('DOMContentLoaded', () => {
   
-  // Verifica se o Firebase foi inicializado corretamente (pelo firebase-config.js)
+  // Verifica se o Firebase foi inicializado corretamente.
   if (typeof firebase === 'undefined' || !firebase.apps.length) {
     console.error("Firebase não foi inicializado. Verifique se firebase-config.js está sendo carregado corretamente.");
-    // Opcional: Desabilitar botões ou mostrar uma mensagem de erro na tela
     return;
   }
 
   const auth = firebase.auth();
   let currentUser = auth.currentUser;
 
-  // Monitora continuamente o estado de autenticação do usuário
+  // Monitora continuamente o estado de autenticação para saber se o usuário está logado.
   auth.onAuthStateChanged(user => {
     currentUser = user;
   });
 
-  // Mapeamento dos botões para suas respectivas ações
+  // Mapeia os IDs dos botões para suas respectivas funções de redirecionamento.
   const buttons = {
     'criar-conta-btn': () => showLoadingAndRedirect('cadastro.html'),
     'entrar-btn': () => {
@@ -49,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'sobre-btn': () => showLoadingAndRedirect('sobre.html')
   };
 
-  // Adiciona os event listeners a todos os botões de forma eficiente
+  // Adiciona os event listeners a todos os botões de forma eficiente.
   for (const id in buttons) {
     const buttonElement = document.getElementById(id);
     if (buttonElement) {

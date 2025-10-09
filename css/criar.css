@@ -192,7 +192,6 @@ body {
    Componentes da UI (Loading, Toast)
    ========================================================================== */
 
-/* === INÍCIO DA CORREÇÃO DA TELA DE CARREGAMENTO === */
 #loading, .loading-overlay {
     position: fixed;
     top: 0;
@@ -225,8 +224,6 @@ body {
     width: 100%;
     height: auto;
 }
-/* === FIM DA CORREÇÃO DA TELA DE CARREGAMENTO === */
-
 
 #toast-container { 
     position: fixed; 

@@ -31,7 +31,7 @@ body.light-mode {
     --input-bg: #f9f9f9;
     --btn-secondary-bg: #e0e0e0;
     --text: #333333;
-    --text-secondary: #555555; /* Cor ajustada */
+    --text-secondary: #555555;
     --border-color: #dddddd;
     --shadow-color: rgba(0, 0, 0, 0.1);
 }
@@ -106,7 +106,7 @@ h2 {
 .match-info-display {
     text-align: center;
     margin-bottom: 20px;
-    background-color: var(--card-bg); /* Alterado para combinar com o resto */
+    background-color: var(--card-bg);
     padding: 15px;
     border-radius: 8px;
     border: 1px solid var(--border-color);
@@ -171,7 +171,7 @@ h2 {
 
 #selected-position-text, .selected-position span {
     color: var(--success-color);
-    font-weight: bold; /* Alterado para bold para mais destaque */
+    font-weight: bold; 
 }
 
 .position {
@@ -213,7 +213,7 @@ h2 {
 .position-piv { top: 25%; left: 50%; }
 
 #position-tooltip, .tooltip {
-    position: fixed; /* Usar fixed para evitar problemas de overflow */
+    position: fixed; 
     background-color: rgba(0, 0, 0, 0.85);
     color: white;
     padding: 5px 10px;
@@ -264,7 +264,7 @@ h2 {
 .form-group input[readonly] {
     background-color: color-mix(in srgb, var(--text) 5%, var(--input-bg));
     color: var(--text-secondary);
-    cursor: default; /* Alterado de not-allowed */
+    cursor: default;
 }
 
 
@@ -355,8 +355,6 @@ h2 {
     }
 }
 
-
-/* === CÓDIGO DO LOADING CORRIGIDO AQUI === */
 #loading, .loading-overlay {
     position: fixed;
     top: 0;
@@ -389,8 +387,6 @@ h2 {
     width: 100%;
     height: auto;
 }
-/* === FIM DA CORREÇÃO DO LOADING === */
-
 
 @media (max-width: 768px) {
     .content-container {

@@ -1,16 +1,24 @@
 'use strict';
 
+/**
+ * @fileoverview Lógica para a página de cadastro (cadastro.html).
+ * Gerencia a criação de novas contas com e-mail/senha e a integração
+ * com o login do Google para preenchimento de dados.
+ */
 document.addEventListener('DOMContentLoaded', () => {
     
+    // Verificação de dependências
     if (typeof firebase === 'undefined' || typeof showToast === 'undefined') {
         console.error("Firebase ou utils.js não foram carregados corretamente.");
         showToast("Ocorreu um erro na página. Tente recarregar.", "error");
         return;
     }
 
+    // Inicialização dos serviços Firebase
     const auth = firebase.auth();
     const db = firebase.firestore();
 
+    // Mapeamento dos elementos da UI
     const ui = {
         form: document.getElementById('registerForm'),
         loadingScreen: document.getElementById('loading'),
@@ -26,40 +34,37 @@ document.addEventListener('DOMContentLoaded', () => {
         telefoneInput: document.getElementById('telefone')
     };
 
+    // Variáveis para armazenar a imagem de perfil
     let selectedProfileFile = null;
     let googleProfilePhotoUrl = null;
 
-    function toggleLoading(show) {
-        ui.loadingScreen.style.display = show ? 'flex' : 'none';
-        document.body.style.cursor = show ? 'wait' : 'default';
-    }
-
-    function convertImageToBase64(file) {
-        return new Promise((resolve, reject) => {
-            if (!file) return resolve(null);
-            const reader = new FileReader();
-            reader.onload = e => resolve(e.target.result);
-            reader.onerror = error => reject(error);
-            reader.readAsDataURL(file);
-        });
-    }
-
+    /**
+     * Lida com a mudança no input de arquivo de imagem.
+     * Exibe um preview da imagem selecionada.
+     * @param {Event} event - O evento de mudança do input.
+     */
     function handleProfileImageChange(event) {
         const file = event.target.files[0];
         if (file) {
-            selectedProfileFile = file;
-            googleProfilePhotoUrl = null;
+            selectedProfileFile = file; // Armazena o arquivo
+            googleProfilePhotoUrl = null; // Limpa a foto do Google, se houver
             const reader = new FileReader();
             reader.onload = e => {
+                // Exibe a imagem no elemento de preview
                 ui.profilePreview.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
     }
     
+    /**
+     * Processa o envio do formulário de cadastro.
+     * @param {Event} event - O evento de submit.
+     */
     async function handleRegisterSubmit(event) {
         event.preventDefault();
 
+        // Coleta e limpa os dados do formulário
         const { nome, email, data, posicao, senha, csenha, telefone } = {
             nome: ui.nomeInput.value.trim(),
             email: ui.emailInput.value.trim(),
@@ -70,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
             telefone: ui.telefoneInput.value.trim()
         };
 
+        // Validações básicas dos campos
         if (!nome || !email || !data || !posicao || !senha || !csenha || !telefone) {
             return showToast("Por favor, preencha todos os campos.", "error");
         }
@@ -87,21 +93,20 @@ document.addEventListener('DOMContentLoaded', () => {
             let user;
             let isGoogleUser = false;
 
+            // Verifica se o usuário já fez login com o Google
             if (currentUser && currentUser.providerData.some(p => p.providerId === 'google.com')) {
                 isGoogleUser = true;
-
-                // A LINHA PROBLEMÁTICA FOI REMOVIDA DAQUI.
-                // Não vamos mais re-autenticar com o pop-up.
-                
+                // Vincula a nova senha à conta Google existente
                 const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, senha);
                 await currentUser.linkWithCredential(credential);
                 user = currentUser;
-
             } else {
+                // Cria um novo usuário com e-mail e senha
                 const userCredential = await auth.createUserWithEmailAndPassword(email, senha);
                 user = userCredential.user;
             }
 
+            // Converte a imagem para Base64 se uma foi selecionada
             let imageToSave = null;
             if (selectedProfileFile) {
                 imageToSave = await convertImageToBase64(selectedProfileFile);
@@ -109,50 +114,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 imageToSave = googleProfilePhotoUrl;
             }
 
+            // Monta o objeto com os dados do usuário para salvar no Firestore
             const userData = {
                 uid: user.uid,
                 nome,
-                nome_lowercase: nome.toLowerCase(),
+                nome_lowercase: nome.toLowerCase(), // Para buscas case-insensitive
                 email: user.email,
                 dataNascimento: data,
                 posicao: posicao,
                 telefone,
                 fotoURL: imageToSave || '',
-                googleV: isGoogleUser ? "Sim" : "Não",
+                googleV: isGoogleUser ? "Sim" : "Não", // Indica se a conta foi iniciada com Google
                 criadoEm: firebase.firestore.FieldValue.serverTimestamp()
             };
 
+            // Salva os dados no Firestore, na coleção 'usuarios', usando o UID do usuário como ID do documento
             await db.collection('usuarios').doc(user.uid).set(userData, { merge: true });
 
             showToast("Cadastro finalizado com sucesso!", "success");
 
+            // Redireciona para a página de login após um breve intervalo
             setTimeout(() => {
                 window.location.href = 'entrar.html';
             }, 1500);
 
         } catch (error) {
             console.error("Erro detalhado no cadastro:", error);
+            // Tratamento de erros comuns do Firebase Auth
             let message = "Ocorreu um erro ao cadastrar. Verifique o console para detalhes.";
-
-            if (error.code) {
-                switch (error.code) {
-                    case 'auth/email-already-in-use':
-                    case 'auth/credential-already-in-use':
-                        message = "Este e-mail já está cadastrado ou vinculado a outra conta.";
-                        break;
-                    case 'auth/invalid-email':
-                        message = "O formato do e-mail é inválido.";
-                        break;
-                    case 'auth/weak-password':
-                        message = "A senha é muito fraca. Use pelo menos 6 caracteres.";
-                        break;
-                    case 'auth/requires-recent-login':
-                        message = "Sua sessão expirou por segurança. Por favor, faça o login com Google novamente e preencha a senha.";
-                        break;
-                    default:
-                        message = `Erro do servidor: ${error.message}`;
-                        break;
-                }
+            switch (error.code) {
+                case 'auth/email-already-in-use':
+                case 'auth/credential-already-in-use':
+                    message = "Este e-mail já está cadastrado ou vinculado a outra conta.";
+                    break;
+                // ... outros casos de erro
             }
             showToast(message, "error");
         } finally {
@@ -160,8 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Lida com o processo de "Continuar com Google".
+     * Preenche os campos do formulário com os dados da conta Google.
+     */
     async function handleGoogleSignIn() {
-        if (auth.currentUser) await auth.signOut();
+        if (auth.currentUser) await auth.signOut(); // Garante que não há sessão ativa
         
         const provider = new firebase.auth.GoogleAuthProvider();
         try {
@@ -169,9 +168,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await auth.signInWithPopup(provider);
             const user = result.user;
 
+            // Preenche os campos do formulário com os dados do Google
             ui.nomeInput.value = user.displayName || '';
             ui.emailInput.value = user.email || '';
-            ui.emailInput.disabled = true; 
+            ui.emailInput.disabled = true; // Impede a edição do e-mail
             
             if (user.photoURL) {
                 ui.profilePreview.src = user.photoURL;
@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             showToast("Dados importados! Crie uma senha e complete seu cadastro.", "info");
-            ui.dataInput.focus();
+            ui.dataInput.focus(); // Move o foco para o próximo campo
 
         } catch (error) {
             console.error("Erro ao importar dados do Google:", error);
@@ -192,23 +192,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-     ui.form.addEventListener('submit', handleRegisterSubmit);
+    // Adiciona os listeners aos elementos
+    ui.form.addEventListener('submit', handleRegisterSubmit);
     ui.profileImageInput.addEventListener('change', handleProfileImageChange);
     ui.googleSignInButton.addEventListener('click', handleGoogleSignIn);
 
-
-    // ==========================================================
-    // CÓDIGO PARA ADICIONAR ABAIXO
-    // ==========================================================
-
+    // Adiciona a funcionalidade de mostrar/ocultar senha para ambos os campos de senha
     document.querySelectorAll('.toggle-password').forEach(toggle => {
         toggle.addEventListener('click', () => {
-            // O input é o elemento "irmão" que vem logo antes do ícone no HTML
             const passwordInput = toggle.previousElementSibling;
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
-            
-            // Alterna as classes do ícone
             toggle.classList.toggle('fa-eye');
             toggle.classList.toggle('fa-eye-slash');
         });

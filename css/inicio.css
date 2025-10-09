@@ -12,7 +12,6 @@
     --success: #00bf63; 
     --error: #ff3b3b; 
     
-    /* Variáveis dinâmicas de tema */ 
     --bg: var(--dark); 
     --text: var(--white); 
     --header-bg: var(--dark-gray); 
@@ -383,11 +382,11 @@ body {
 }
 
 #btn-anterior {
-    left: 1px; /* <- POSIÇÃO CORRIGIDA PARA DENTRO */
+    left: 1px;
 }
 
 #btn-proximo {
-    right: 1px; /* <- POSIÇÃO CORRIGIDA PARA DENTRO */
+    right: 1px;
 }
 
 /* ============================================== */

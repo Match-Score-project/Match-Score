@@ -163,7 +163,6 @@ footer {
     color: #aaa;
     z-index: 2;
     margin-top: auto;
-    /* Garante que o footer fique na base */
 }
 
 .loading-overlay {

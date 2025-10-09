@@ -1,12 +1,5 @@
 // firebase-config.js
 
-/**
- * ATENÇÃO: Este arquivo agora é a ÚNICA fonte para a configuração do Firebase.
- * Ele deve ser importado no HTML antes de qualquer outro script que use o Firebase.
- * * A função getFirebaseConfig() foi removida pois a inicialização será feita
- * de forma mais segura e modular nos scripts que a necessitam.
- */
-
 const firebaseConfig = {
   apiKey: "AIzaSyAqsEZOt1_6qeQOFbcHksbGhkmjPF4kPGU",
   authDomain: "match-score-d70bf.firebaseapp.com",

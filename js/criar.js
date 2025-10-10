@@ -6,27 +6,21 @@
  */
 document.addEventListener('DOMContentLoaded', () => {
     
-    // Aplica o tema do usuário (claro/escuro) se a função estiver disponível
     if (typeof applyUserTheme === 'function') {
         applyUserTheme();
     }
 
-    // Verificação de dependências
     if (typeof firebase === 'undefined' || typeof showToast === 'undefined') {
         console.error("Firebase ou utils.js não foram carregados.");
         return;
     }
 
-    // Inicialização dos serviços Firebase
     const auth = firebase.auth();
     const db = firebase.firestore();
     let currentUser = null;
-
-    // Variáveis de estado para controlar o modo de edição
     let isEditMode = false;
     let currentMatchId = null;
 
-    // Mapeamento dos elementos da UI
     const ui = {
         form: document.getElementById('matchForm'),
         dateInput: document.getElementById('data'),
@@ -37,22 +31,13 @@ document.addEventListener('DOMContentLoaded', () => {
         matchIdInput: document.getElementById('matchIdInput')
     };
 
-    /**
-     * Observador do estado de autenticação.
-     * Quando o usuário está logado, inicia a lógica da página.
-     */
     auth.onAuthStateChanged(user => {
         if (user) {
             currentUser = user;
-            // Verifica se a página está em modo de edição
             checkForEditMode();
         }
     });
 
-    /**
-     * Verifica se há um 'id' de partida na URL.
-     * Se houver, configura a página para o modo de edição.
-     */
     async function checkForEditMode() {
         const urlParams = new URLSearchParams(window.location.search);
         currentMatchId = urlParams.get('id');
@@ -61,15 +46,12 @@ document.addEventListener('DOMContentLoaded', () => {
             isEditMode = true;
             ui.matchIdInput.value = currentMatchId;
             
-            // Altera os textos da UI para refletir o modo de edição
             ui.pageTitle.textContent = 'Editar Partida';
             ui.submitButton.textContent = 'Salvar Alterações';
 
             try {
-                // Busca os dados da partida no Firestore
                 const doc = await db.collection('partidas').doc(currentMatchId).get();
                 if (doc.exists) {
-                    // Preenche o formulário com os dados existentes
                     fillFormWithMatchData(doc.data());
                 } else {
                     showToast('Partida não encontrada.', 'error');
@@ -82,10 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /**
-     * Preenche os campos do formulário com os dados de uma partida existente.
-     * @param {object} data - Os dados da partida vindos do Firestore.
-     */
     function fillFormWithMatchData(data) {
         ui.form.nome.value = data.nome || '';
         ui.form.data.value = data.data || '';
@@ -101,23 +79,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    /**
-     * Prepara o formulário, definindo a data mínima e adicionando o listener de submit.
-     */
     const setupForm = () => {
-        // Impede que o usuário selecione uma data passada
-        const today = new Date().toISOString().split('T')[0];
-        if (ui.dateInput) ui.dateInput.min = today;
+        const todayDate = new Date();
+        const year = todayDate.getFullYear();
+        const month = String(todayDate.getMonth() + 1).padStart(2, '0');
+        const day = String(todayDate.getDate()).padStart(2, '0');
+        const todayString = `${year}-${month}-${day}`;
         
-        // Adiciona os listeners aos elementos do formulário
+        if (ui.dateInput) ui.dateInput.min = todayString;
+        
         if (ui.form) ui.form.addEventListener('submit', handleFormSubmit);
         if (ui.imageInput) ui.imageInput.addEventListener('change', previewImage);
     };
 
-    /**
-     * Exibe um preview da imagem selecionada pelo usuário.
-     * @param {Event} event - O evento de mudança do input de imagem.
-     */
     function previewImage(event) {
         const file = event.target.files[0];
         if (file && ui.imagePreview) {
@@ -130,17 +104,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /**
-     * Lida com o envio do formulário, tanto para criar quanto para atualizar uma partida.
-     * @param {Event} event - O evento de submit.
-     */
     async function handleFormSubmit(event) {
         event.preventDefault();
         if (!currentUser) {
             return showToast("Você precisa estar logado.", "error");
         }
         
-        // Coleta os dados do formulário
         const partida = {
             nome: document.getElementById('nome').value,
             data: document.getElementById('data').value,
@@ -151,27 +120,42 @@ document.addEventListener('DOMContentLoaded', () => {
             vagasTotais: Number(document.getElementById('vagasTotais').value)
         };
 
-        // Validação simples
         if (!partida.nome || !partida.data || !partida.hora || !partida.local || !partida.modalidade || !partida.tipo || !partida.vagasTotais) {
             return showToast("Por favor, preencha todos os campos obrigatórios.", "error");
         }
 
+        // --- A LÓGICA DE VALIDAÇÃO QUE ESTAVA FALTANDO COMEÇA AQUI ---
+        const minVagas = {
+            futsal: 10,
+            society: 14,
+            campo: 22
+        };
+
+        const tipoSelecionado = partida.tipo;
+        const vagasInformadas = partida.vagasTotais;
+
+        if (minVagas[tipoSelecionado]) {
+            const minimoExigido = minVagas[tipoSelecionado];
+            if (vagasInformadas < minimoExigido) {
+                showToast(`Para ${tipoSelecionado}, o número mínimo de vagas é ${minimoExigido}.`, "error");
+                return; // Impede o código de continuar
+            }
+        }
+        // --- FIM DA LÓGICA DE VALIDAÇÃO ---
+
         toggleLoading(true);
 
         try {
-            // Se uma nova imagem foi selecionada, converte para Base64
             const imageFile = ui.imageInput.files[0];
             if (imageFile) {
                 partida.imagemURL = await convertImageToBase64(imageFile);
             }
 
             if (isEditMode) {
-                // Se estiver em modo de edição, atualiza o documento existente
                 partida.atualizadoEm = firebase.firestore.FieldValue.serverTimestamp();
-                await db.collection('partidas').doc(currentMatchId).update(partida);
+                await db.collection('partidas').doc(currentMatchId).set(partida, { merge: true });
                 showToast("Partida atualizada com sucesso!", "success");
             } else {
-                // Caso contrário, cria um novo documento
                 partida.creatorId = currentUser.uid;
                 partida.creatorName = currentUser.displayName || 'Usuário Anônimo';
                 partida.criadoEm = firebase.firestore.FieldValue.serverTimestamp();
@@ -179,7 +163,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast("Partida criada com sucesso!", "success");
             }
 
-            // Redireciona para a página inicial após o sucesso
             setTimeout(() => { window.location.href = 'inicio.html'; }, 1500);
 
         } catch (error) {
@@ -190,6 +173,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Inicializa a configuração do formulário.
     setupForm();
 });

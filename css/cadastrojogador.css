@@ -405,3 +405,14 @@ h2 {
         padding: 1.5rem;
     }
 }
+
+/* Estilo para Campo e Society */
+.court-style-field .position.available {
+    background-color: #007BFF; /* Azul Vibrante */
+    border-color: #cce5ff;    /* Borda azul clara */
+}
+
+/* Garante que o pino selecionado (ativo) tenha a cor primária do tema */
+.court-style-field .position.active {
+    border-color: var(--primary);
+}

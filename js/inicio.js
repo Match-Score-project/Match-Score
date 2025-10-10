@@ -899,18 +899,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     /**
-     * Busca e exibe as partidas nas quais o usuário está inscrito.
+     * Busca verifica se não esta expirada e exibe as partidas nas quais o usuário está inscrito.
      */
-    async function fetchAndDisplayRegisteredMatches() {
+      async function fetchAndDisplayRegisteredMatches() {
         if (!currentUser || !ui.registeredMatchesGrid) return;
         ui.registeredMatchesGrid.innerHTML = '<p>Buscando jogos em que você se cadastrou...</p>';
         try {
-            const playerRegistrations = await db.collectionGroup('jogadores').where('userId', '==', currentUser.uid).get();
-            if (playerRegistrations.empty) {
-                ui.registeredMatchesGrid.innerHTML = '<p>Você não se cadastrou em nenhuma partida ainda.</p>';
-                return;
-            }
+            // Pega a data de hoje para fazer a comparação
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Normaliza para o início do dia para uma comparação justa
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const todayString = `${year}-${month}-${day}`;
 
+            const playerRegistrations = await db.collectionGroup('jogadores').where('userId', '==', currentUser.uid).get();
+            
             const registeredMatchesHtmlArray = [];
             for (const registrationDoc of playerRegistrations.docs) {
                 const matchRef = registrationDoc.ref.parent.parent;
@@ -918,9 +922,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (matchDoc.exists) {
                     const matchData = matchDoc.data();
                     const matchId = matchDoc.id;
+
+                    // Se a data da partida for anterior a hoje, pula para a próxima iteração do loop.
+                    if (matchData.data < todayString) {
+                        continue; 
+                    }
+
                     registeredMatchesHtmlArray.push(createRegisteredMatchCard(matchData, matchId));
                 }
             }
+
+            if (registeredMatchesHtmlArray.length === 0) {
+                 ui.registeredMatchesGrid.innerHTML = '<p>Você não está cadastrado em nenhuma partida futura.</p>';
+                 return;
+            }
+
             ui.registeredMatchesGrid.innerHTML = registeredMatchesHtmlArray.join('');
 
         } catch (error) {
@@ -929,7 +945,6 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('Erro ao buscar seus jogos.', 'error');
         }
     }
-
     /**
      * Busca e exibe todas as partidas disponíveis, aplicando os filtros selecionados.
      */
@@ -1007,11 +1022,20 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchAndDisplayMyMatches() {
         if (!currentUser || !ui.myMatchesGrid) return;
         ui.myMatchesGrid.innerHTML = '<p>Carregando suas partidas...</p>';
-        
-        const today = new Date().toISOString().split('T')[0];
+
+        // --- INÍCIO DA CORREÇÃO ---
+        // Obtém a data de hoje de forma segura, sem converter para UTC.
+        // Isso garante que a data seja sempre a local do usuário.
+        const todayDate = new Date();
+        const year = todayDate.getFullYear();
+        const month = String(todayDate.getMonth() + 1).padStart(2, '0'); // getMonth() é 0-indexed
+        const day = String(todayDate.getDate()).padStart(2, '0');
+        const todayString = `${year}-${month}-${day}`;
+        // --- FIM DA CORREÇÃO ---
 
         try {
-            const snapshot = await db.collection('partidas').where('creatorId', '==', currentUser.uid).where('data', '>=', today).orderBy('data', 'asc').get();
+            // A query agora usará a string de data local correta.
+            const snapshot = await db.collection('partidas').where('creatorId', '==', currentUser.uid).where('data', '>=', todayString).orderBy('data', 'asc').get();
             if (snapshot.empty) {
                 ui.myMatchesGrid.innerHTML = '<p>Você não tem nenhuma partida futura criada.</p>';
                 return;
